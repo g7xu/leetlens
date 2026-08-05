@@ -18,6 +18,7 @@ export class SessionMachine {
     this.runCount = 0;
     this.failedRunCount = 0;
     this.submitCount = 0;
+    this.pausedAt = null;
   }
 
   static randomId() {
@@ -30,10 +31,36 @@ export class SessionMachine {
     return this.outcome !== null;
   }
 
+  get paused() {
+    return this.pausedAt !== null;
+  }
+
   // -- transitions ---------------------------------------------------
 
+  pause(now = Date.now()) {
+    if (this.ended || this.paused) return;
+    this._closeSegment(now);
+    this.pausedAt = now;
+  }
+
+  resume(now = Date.now()) {
+    if (this.ended || !this.paused) return;
+    this.pausedAt = null;
+    this.currentStart = now;
+  }
+
   setPhase(phase, source = 'manual', now = Date.now()) {
-    if (this.ended || phase === this.currentPhase) return;
+    if (this.ended) return;
+    if (this.paused) {
+      // Picking a phase while paused resumes straight into it; the segment
+      // up to the pause is already closed.
+      this.pausedAt = null;
+      this.currentPhase = phase;
+      this.currentSource = source;
+      this.currentStart = now;
+      return;
+    }
+    if (phase === this.currentPhase) return;
     this._closeSegment(now);
     this.currentPhase = phase;
     this.currentSource = source;
@@ -41,19 +68,22 @@ export class SessionMachine {
   }
 
   editorInput(now = Date.now()) {
+    this.resume(now); // typing means you're back
     if (!this.hasWritten && this.currentPhase === 'thinking') {
       this.setPhase('writing', 'auto', now);
     }
     this.hasWritten = true;
   }
 
-  runStarted() {
+  runStarted(now = Date.now()) {
     if (this.ended) return;
+    this.resume(now);
     this.runCount += 1;
   }
 
   runResult(passed, now = Date.now()) {
     if (this.ended) return;
+    this.resume(now);
     if (!passed) {
       this.failedRunCount += 1;
       this.setPhase('debugging', 'auto', now);
@@ -62,13 +92,15 @@ export class SessionMachine {
     }
   }
 
-  submitStarted() {
+  submitStarted(now = Date.now()) {
     if (this.ended) return;
+    this.resume(now);
     this.submitCount += 1;
   }
 
   submitResult(accepted, now = Date.now()) {
     if (this.ended) return;
+    this.resume(now);
     if (accepted) {
       this.end('accepted', now);
     } else {
@@ -79,11 +111,13 @@ export class SessionMachine {
   end(outcome, now = Date.now()) {
     if (this.ended) return;
     this._closeSegment(now);
+    this.pausedAt = null;
     this.outcome = outcome;
     this.endedAt = now;
   }
 
   _closeSegment(now) {
+    if (this.paused) return; // segment was already closed at pause time
     if (now > this.currentStart) {
       this.segments.push({
         phase: this.currentPhase,
@@ -101,7 +135,7 @@ export class SessionMachine {
     for (const seg of this.segments) {
       totals[seg.phase] += (seg.end - seg.start) / 1000;
     }
-    if (!this.ended) {
+    if (!this.ended && !this.paused) {
       totals[this.currentPhase] += (now - this.currentStart) / 1000;
     }
     for (const k of Object.keys(totals)) totals[k] = Math.round(totals[k]);
@@ -161,6 +195,7 @@ export class SessionMachine {
       failedRunCount: this.failedRunCount,
       submitCount: this.submitCount,
       language: this.language,
+      pausedAt: this.pausedAt,
       heartbeat: now,
     };
   }
@@ -182,6 +217,12 @@ export class SessionMachine {
     });
     if (snap.outcome) {
       // Ended sessions restore verbatim; every segment is already closed.
+      m.currentStart = snap.currentStart;
+      return m;
+    }
+    if (snap.pausedAt) {
+      // Paused sessions restore paused; segments closed at pause time.
+      m.pausedAt = snap.pausedAt;
       m.currentStart = snap.currentStart;
       return m;
     }

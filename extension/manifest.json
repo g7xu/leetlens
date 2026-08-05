@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LeetLens",
   "description": "Track how you solve LeetCode: phase timing, run counts, notes and tags, committed to GitHub.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "permissions": ["storage"],
   "host_permissions": ["https://leetcode.com/*", "https://api.github.com/*"],
   "background": {

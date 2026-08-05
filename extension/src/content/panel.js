@@ -57,6 +57,23 @@ export class Panel {
     // live view -------------------------------------------------------
     this.timer = el('span', { className: 'timer', textContent: '00:00' });
     this.badge = el('span', { className: 'phase-badge thinking', textContent: 'thinking' });
+    this.pauseBtn = el('button', { className: 'icon-btn', textContent: '⏸', title: 'Pause timer' });
+    this.pauseBtn.addEventListener('click', () => this.cb.onPauseToggle());
+    this.resetBtn = el('button', { className: 'icon-btn', textContent: '↺', title: 'Restart session' });
+    this.resetBtn.addEventListener('click', () => {
+      if (this.resetBtn.dataset.armed) {
+        delete this.resetBtn.dataset.armed;
+        this.resetBtn.textContent = '↺';
+        this.cb.onReset();
+      } else {
+        this.resetBtn.dataset.armed = '1';
+        this.resetBtn.textContent = 'sure?';
+        setTimeout(() => {
+          delete this.resetBtn.dataset.armed;
+          this.resetBtn.textContent = '↺';
+        }, 3000);
+      }
+    });
     this.phaseButtons = {};
     const phaseGrid = el('div', { className: 'phase-buttons' });
     for (const phase of PHASES) {
@@ -71,7 +88,11 @@ export class Panel {
     const giveUpBtn = el('button', { className: 'btn-giveup', textContent: 'Give up' });
     giveUpBtn.addEventListener('click', () => this.cb.onGiveUp());
     this.liveView = el('div', {}, [
-      el('div', { className: 'timer-row' }, [this.timer, this.badge]),
+      el('div', { className: 'timer-row' }, [
+        this.timer, this.badge,
+        el('span', { className: 'spacer' }),
+        this.pauseBtn, this.resetBtn,
+      ]),
       phaseGrid,
       this.counters,
       el('div', { className: 'actions' }, [finishBtn, giveUpBtn]),
@@ -141,10 +162,19 @@ export class Panel {
 
   update(machine, now = Date.now()) {
     this.timer.textContent = fmtClock(machine.elapsedSec(now));
-    this.badge.textContent = machine.currentPhase;
-    this.badge.className = `phase-badge ${machine.currentPhase}`;
+    if (machine.paused) {
+      this.badge.textContent = 'paused';
+      this.badge.className = 'phase-badge paused';
+      this.pauseBtn.textContent = '▶';
+      this.pauseBtn.title = 'Resume timer';
+    } else {
+      this.badge.textContent = machine.currentPhase;
+      this.badge.className = `phase-badge ${machine.currentPhase}`;
+      this.pauseBtn.textContent = '⏸';
+      this.pauseBtn.title = 'Pause timer';
+    }
     for (const [phase, btn] of Object.entries(this.phaseButtons)) {
-      btn.classList.toggle('active', phase === machine.currentPhase);
+      btn.classList.toggle('active', !machine.paused && phase === machine.currentPhase);
     }
     this.counters.replaceChildren(
       el('span', {}, ['runs ', el('b', { textContent: machine.runCount })]),

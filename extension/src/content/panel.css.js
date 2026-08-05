@@ -34,6 +34,15 @@ export const PANEL_CSS = `
 .phase-badge.writing   { background: #2c4436; color: #8fd9a8; }
 .phase-badge.reviewing { background: #45402a; color: #e6cf7a; }
 .phase-badge.debugging { background: #4a2f33; color: #f2a0a8; }
+.phase-badge.paused    { background: #2b2f37; color: #9aa3b2; }
+
+.spacer { flex: 1; }
+.icon-btn {
+  background: #262b34; color: #c7cdd6; border: 1px solid #333a45;
+  border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 12px;
+  line-height: 18px;
+}
+.icon-btn:hover { background: #2e3440; }
 
 .phase-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
 .phase-buttons button {

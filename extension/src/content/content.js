@@ -108,6 +108,13 @@
 
     panel = new Panel({
       onPhase: (phase) => { machine?.setPhase(phase, 'manual'); persist(); panel.update(machine); },
+      onPauseToggle: () => {
+        if (!machine || machine.ended) return;
+        machine.paused ? machine.resume() : machine.pause();
+        persist();
+        panel.update(machine);
+      },
+      onReset: async () => { await clearStored(currentSlug); freshSession(machine.problem); },
       onFinish: () => endSession('accepted'),
       onGiveUp: () => endSession('gave_up'),
       onSave: (values) => saveSession(values),
