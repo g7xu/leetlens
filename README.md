@@ -19,9 +19,12 @@ LeetLens is a companion to [LeetHub-3.0](https://github.com/raphaelheinz/LeetHub
 ### 1. Chrome extension
 
 1. `chrome://extensions` → enable Developer mode → **Load unpacked** → select the `extension/` folder.
-2. Create a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new): repository access = **only this repo**, permissions = **Contents: Read and write**.
-3. Open the extension's Options page, paste the token, set owner/repo/branch, click **Test connection**.
-4. Open any LeetCode problem — the LeetLens panel appears. Timer starts in *Thinking*; phase buttons override auto-detection; **Finish**/**Give up** opens the save form; **Save to GitHub** commits the session.
+2. Create a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new) — the two settings below are the ones that cause `403: Resource not accessible by personal access token` when missed:
+   - **Repository access**: choose **Only select repositories** and pick this repo. If the repo is *private*, the default "Public repositories" option silently excludes it.
+   - **Repository permissions**: in the *Select repository permissions* search box type **contents** (search by permission *name* — typing "read" finds nothing), click **Contents**, then set its *Access* dropdown to **Read and write**. "Metadata: Read-only" is added automatically — leave it.
+   - Everything else stays at "No access". Set an expiration you're comfortable with (max 1 year); when it expires, commits start failing with 401 — just regenerate and re-paste.
+3. Open the extension's Options page, fill owner / repo / branch, paste the token, and click **Test connection**. You want the green *"push access ✓"* — "repo lookup failed (404)" means the repo isn't granted to the token; "token cannot push" means Contents is still read-only.
+4. Open any LeetCode problem — the LeetLens panel appears. The timer starts in *Thinking*; phase buttons override auto-detection; **⏸** pauses (typing or running auto-resumes), **↺** restarts a browse-only session; **Finish**/**Give up** opens the save form; **Save to GitHub** commits the session. If a save fails, the form (and your notes) stay put — fix the token and click save again.
 
 ### 2. MCP server (Claude Code / Claude Desktop / ChatGPT)
 
