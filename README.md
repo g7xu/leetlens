@@ -52,8 +52,11 @@ Claude Desktop (`claude_desktop_config.json`):
 By default the server reads the local clone. To run it without a clone (e.g. remote/ChatGPT), set `LCP_SOURCE=github` (and optionally `LCP_GITHUB_REPO=owner/repo`), then expose it over streamable HTTP:
 
 ```bash
-LCP_SOURCE=github uv run --directory mcp leetlens-mcp --transport streamable-http --port 8765
+LCP_SOURCE=github LCP_GITHUB_TOKEN=github_pat_… \
+  uv run --directory mcp leetlens-mcp --transport streamable-http --port 8765
 ```
+
+`LCP_GITHUB_TOKEN` is required for **private** repos (the same fine-grained PAT as the extension works — Contents: read is enough); with a token set, files are fetched through the authenticated Contents API instead of raw.githubusercontent.com. Public repos work without it.
 
 and add it as a connector in ChatGPT → Settings → Connectors (developer mode), e.g. through an `ngrok http 8765` tunnel.
 

@@ -1,9 +1,12 @@
-"""Load session data from a local clone (default) or from GitHub raw files.
+"""Load session data from a local clone (default) or from GitHub.
 
 Modes (env var LCP_SOURCE):
   local  - read data/ from the repo clone this package lives in (or LCP_REPO_PATH)
-  github - fetch from raw.githubusercontent.com, no clone needed
-           (LCP_GITHUB_REPO=owner/repo, LCP_GITHUB_BRANCH=main)
+  github - fetch from GitHub, no clone needed
+           (LCP_GITHUB_REPO=owner/repo, LCP_GITHUB_BRANCH=main).
+           Set LCP_GITHUB_TOKEN for private repos: file contents are then
+           fetched through the authenticated Contents API instead of
+           raw.githubusercontent.com (which has no auth for private repos).
 """
 
 from __future__ import annotations
@@ -30,7 +33,14 @@ class DataStore:
         self.mode = os.environ.get("LCP_SOURCE", "local")
         self.repo = os.environ.get("LCP_GITHUB_REPO", "g7xu/leetlens")
         self.branch = os.environ.get("LCP_GITHUB_BRANCH", "main")
+        self.token = os.environ.get("LCP_GITHUB_TOKEN")
         self._cache: dict[str, tuple[float, object]] = {}
+
+    def _api_headers(self) -> dict[str, str]:
+        headers = {"X-GitHub-Api-Version": "2022-11-28"}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        return headers
 
     # -- caching -------------------------------------------------------
     def _cached(self, key: str, loader):
@@ -78,23 +88,42 @@ class DataStore:
             rec["attempt_number"] = by_problem[key]
         return records
 
+    def load_index_raw(self) -> str:
+        """The raw data/index.json text (for the MCP resource)."""
+        if self.mode == "github":
+            return self._fetch_raw("data/index.json") or "{}"
+        path = repo_root() / "data" / "index.json"
+        return path.read_text() if path.exists() else "{}"
+
     # -- github mode ---------------------------------------------------
     def _load_sessions_github(self) -> list[dict]:
         tree_url = f"https://api.github.com/repos/{self.repo}/git/trees/{self.branch}?recursive=1"
         with httpx.Client(timeout=30) as client:
-            tree = client.get(tree_url).raise_for_status().json()
+            tree = client.get(tree_url, headers=self._api_headers()).raise_for_status().json()
             paths = [
                 node["path"]
                 for node in tree["tree"]
                 if node["path"].startswith("data/sessions/") and node["path"].endswith(".json")
             ]
-            return [
-                client.get(self._raw_url(p)).raise_for_status().json() for p in paths
-            ]
+            return [json.loads(self._fetch_raw(p, client=client)) for p in paths]
 
-    def _raw_url(self, path: str) -> str:
-        return f"https://raw.githubusercontent.com/{self.repo}/{self.branch}/{path}"
+    def _fetch_raw(self, path: str, client: httpx.Client | None = None) -> str | None:
+        """File contents at `path` on the configured branch, or None if absent.
 
-    def _fetch_raw(self, path: str) -> str | None:
-        resp = httpx.get(self._raw_url(path), timeout=30)
+        With a token, goes through the Contents API (works for private repos);
+        without one, raw.githubusercontent.com (public repos only).
+        """
+        if self.token:
+            url = f"https://api.github.com/repos/{self.repo}/contents/{path}"
+            kwargs = {
+                "params": {"ref": self.branch},
+                "headers": {**self._api_headers(), "Accept": "application/vnd.github.raw+json"},
+            }
+        else:
+            url = f"https://raw.githubusercontent.com/{self.repo}/{self.branch}/{path}"
+            kwargs = {}
+        if client is not None:
+            resp = client.get(url, **kwargs)
+        else:
+            resp = httpx.get(url, timeout=30, **kwargs)
         return resp.text if resp.status_code == 200 else None

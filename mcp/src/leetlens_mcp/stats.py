@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from statistics import mean, median
 
 PHASES = ("thinking", "writing", "reviewing", "debugging")
@@ -170,6 +170,174 @@ def problem_summaries(records: list[dict]) -> list[dict]:
             }
         )
     return out
+
+
+def revenge_list(records: list[dict]) -> list[dict]:
+    """Problems with a gave_up session and no accepted session after it."""
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for rec in records:  # records arrive sorted by started_at
+        groups[rec["problem"]["dir_key"]].append(rec)
+    out = []
+    for dir_key, rs in groups.items():
+        last_accepted = max((r["started_at"] for r in rs if r["outcome"] == "accepted"), default=None)
+        last_gave_up = max((r["started_at"] for r in rs if r["outcome"] == "gave_up"), default=None)
+        if last_gave_up and (last_accepted is None or last_accepted < last_gave_up):
+            prob = rs[0]["problem"]
+            out.append(
+                {
+                    "dir_key": dir_key,
+                    "slug": prob["slug"],
+                    "title": prob["title"],
+                    "difficulty": prob["difficulty"],
+                    "url": prob["url"],
+                    "attempts": len(rs),
+                    "gave_up_count": sum(r["outcome"] == "gave_up" for r in rs),
+                    "last_tried": _date(rs[-1]),
+                    "tags": sorted({t for r in rs for t in r.get("tags", [])}),
+                }
+            )
+    out.sort(key=lambda r: r["last_tried"], reverse=True)
+    return out
+
+
+def stale_tags(records: list[dict], days: int = 30, today: date | None = None) -> list[dict]:
+    """Tags not practiced in `days` days — the spaced-repetition signal."""
+    today = today or date.today()
+    cutoff = (today - timedelta(days=days)).isoformat()
+    out = [
+        {
+            "tag": tag,
+            "last_seen": st["last_seen"],
+            "days_since": (today - date.fromisoformat(st["last_seen"])).days,
+            "session_count": st["session_count"],
+            "give_up_rate": st["give_up_rate"],
+        }
+        for tag, st in by_tag(records).items()
+        if st["last_seen"] < cutoff
+    ]
+    out.sort(key=lambda r: r["last_seen"])
+    return out
+
+
+def search_notes(records: list[dict], query: str, limit: int = 20) -> list[dict]:
+    """Case-insensitive substring search over logic_idea and comments, newest first."""
+    q = query.lower()
+    out = []
+    for rec in reversed(records):
+        matched = {
+            field: text
+            for field in ("logic_idea", "comments")
+            if q in (text := rec.get(field, "")).lower()
+        }
+        if matched:
+            out.append({**session_summary(rec), "matched": matched})
+            if len(out) >= limit:
+                break
+    return out
+
+
+def _period_bounds(spec: str, today: date) -> tuple[str, str]:
+    """Resolve a period spec to inclusive [from, to] ISO dates."""
+    if spec == "this_month":
+        return today.replace(day=1).isoformat(), today.isoformat()
+    if spec == "last_month":
+        last_prev = today.replace(day=1) - timedelta(days=1)
+        return last_prev.replace(day=1).isoformat(), last_prev.isoformat()
+    if spec == "last_30d":
+        return (today - timedelta(days=29)).isoformat(), today.isoformat()
+    if spec == "prev_30d":
+        return (today - timedelta(days=59)).isoformat(), (today - timedelta(days=30)).isoformat()
+    if len(spec) == 7 and spec[4] == "-":  # YYYY-MM
+        year, month = int(spec[:4]), int(spec[5:7])
+        next_first = date(year + (month == 12), month % 12 + 1, 1)
+        return f"{spec}-01", (next_first - timedelta(days=1)).isoformat()
+    raise ValueError(
+        f"unknown period {spec!r} — use this_month, last_month, last_30d, prev_30d, or YYYY-MM"
+    )
+
+
+def compare_periods(
+    records: list[dict], period_a: str, period_b: str, today: date | None = None
+) -> dict:
+    """Side-by-side stats for two periods plus deltas (a minus b)."""
+    today = today or date.today()
+
+    def period(spec: str) -> dict:
+        lo, hi = _period_bounds(spec, today)
+        rs = [r for r in records if lo <= _date(r) <= hi]
+        st = _group_stats(rs) if rs else {"session_count": 0}
+        if rs:
+            shares = [
+                r["phase_totals_sec"]["debugging"] / r["total_active_sec"]
+                for r in rs
+                if r["total_active_sec"]
+            ]
+            st["debugging_share"] = round(mean(shares), 3) if shares else 0
+        return {"spec": spec, "from": lo, "to": hi, **st}
+
+    a, b = period(period_a), period(period_b)
+    deltas = {
+        key: round(a[key] - b[key], 3)
+        for key in (
+            "session_count", "give_up_rate", "avg_total_sec",
+            "median_total_sec", "avg_run_count", "debugging_share",
+        )
+        if key in a and key in b
+    }
+    return {"period_a": a, "period_b": b, "delta_a_minus_b": deltas}
+
+
+def recommend_next(records: list[dict], count: int = 3, today: date | None = None) -> list[dict]:
+    """Concrete "solve this next" suggestions: revenge problems, weak tags, stale tags."""
+    revenge = [
+        {
+            "type": "revenge",
+            "action": f"Re-attempt {r['title']} ({r['difficulty']})",
+            "target": r["url"],
+            "reason": (
+                f"Gave up {r['gave_up_count']}x (last tried {r['last_tried']}) "
+                "with no accepted attempt since."
+            ),
+        }
+        for r in revenge_list(records)
+    ]
+    weak = [
+        {
+            "type": "weak_tag",
+            "action": f"Practice a fresh {w['tag']} problem",
+            "target": w["tag"],
+            "reason": (
+                f"Weak area (score {w['score']}): {round(w['give_up_rate'] * 100)}% give-ups, "
+                f"{w['avg_total_sec']}s avg vs {w['global_median_sec']}s global median, "
+                f"{round(w['debugging_share'] * 100)}% of time debugging."
+            ),
+        }
+        for w in weak_areas(records, top_n=count)
+    ]
+    stale = [
+        {
+            "type": "stale_tag",
+            "action": f"Refresh {s['tag']}",
+            "target": s["tag"],
+            "reason": f"Not practiced in {s['days_since']} days ({s['session_count']} past sessions).",
+        }
+        for s in stale_tags(records, today=today)
+    ]
+    # Round-robin the three sources so one long list can't crowd out the others.
+    suggestions: list[dict] = []
+    seen_targets: set[str] = set()
+    pools = [revenge, weak, stale]
+    while len(suggestions) < count and any(pools):
+        for pool in pools:
+            while pool:
+                item = pool.pop(0)
+                if item["target"] not in seen_targets:
+                    seen_targets.add(item["target"])
+                    suggestions.append(item)
+                    break
+            if len(suggestions) >= count:
+                break
+    return suggestions
 
 
 def daily_activity(records: list[dict]) -> dict[str, dict]:
