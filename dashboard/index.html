@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LeetLens</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+          integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC"
+          crossorigin="anonymous"></script>
+</head>
+<body>
+  <header>
+    <h1>🔍 LeetLens</h1>
+    <p class="sub">How you solve, not just what you solved.
+      <span id="generatedAt" class="muted"></span></p>
+  </header>
+
+  <div class="filters" id="filters">
+    <select id="rangeFilter" aria-label="Date range">
+      <option value="all">All time</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+    </select>
+    <select id="difficultyFilter" aria-label="Difficulty">
+      <option value="">All difficulties</option>
+      <option>Easy</option><option>Medium</option><option>Hard</option>
+    </select>
+    <select id="tagFilter" aria-label="Tag">
+      <option value="">All tags</option>
+    </select>
+  </div>
+
+  <section class="tiles" id="tiles"></section>
+
+  <section class="card">
+    <h2>Activity</h2>
+    <div id="calendar" class="calendar"></div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Time per phase, per session</h2>
+      <div class="chart-box"><canvas id="phaseChart"></canvas></div>
+    </section>
+    <section class="card">
+      <h2>Solve time trend <span class="muted">(accepted only)</span></h2>
+      <div class="chart-box"><canvas id="trendChart"></canvas></div>
+    </section>
+    <section class="card">
+      <h2>Phase mix by tag <span class="muted">(sorted by debugging share)</span></h2>
+      <div class="chart-box tall"><canvas id="tagMixChart"></canvas></div>
+    </section>
+    <section class="card">
+      <h2>Give-up rate by tag</h2>
+      <div class="chart-box tall"><canvas id="giveUpChart"></canvas></div>
+    </section>
+    <section class="card">
+      <h2>Runs per session</h2>
+      <div class="chart-box"><canvas id="runChart"></canvas></div>
+    </section>
+    <section class="card">
+      <h2>Recent sessions</h2>
+      <div class="table-wrap">
+        <table id="sessionTable">
+          <thead><tr>
+            <th>Date</th><th>Problem</th><th>Diff</th><th>Outcome</th>
+            <th>Time</th><th>Runs</th><th>Tags</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <footer class="muted">
+    Data: <code>data/index.json</code> — rebuilt on every push ·
+    <a href="https://github.com/g7xu/leetlens">repo</a>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

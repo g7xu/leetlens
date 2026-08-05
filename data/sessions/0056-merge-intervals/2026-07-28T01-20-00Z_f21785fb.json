@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "session_id": "f21785fb",
+  "problem": {
+    "frontend_id": "56",
+    "dir_key": "0056-merge-intervals",
+    "slug": "merge-intervals",
+    "title": "Merge Intervals",
+    "difficulty": "Medium",
+    "url": "https://leetcode.com/problems/merge-intervals/"
+  },
+  "language": "python3",
+  "started_at": "2026-07-27T18:20:00-07:00",
+  "ended_at": "2026-07-27T18:39:00-07:00",
+  "outcome": "accepted",
+  "phases": [
+    {
+      "phase": "thinking",
+      "start": "2026-07-27T18:20:00-07:00",
+      "end": "2026-07-27T18:25:00-07:00",
+      "source": "auto"
+    },
+    {
+      "phase": "writing",
+      "start": "2026-07-27T18:25:00-07:00",
+      "end": "2026-07-27T18:34:00-07:00",
+      "source": "auto"
+    },
+    {
+      "phase": "debugging",
+      "start": "2026-07-27T18:34:00-07:00",
+      "end": "2026-07-27T18:37:00-07:00",
+      "source": "manual"
+    },
+    {
+      "phase": "reviewing",
+      "start": "2026-07-27T18:37:00-07:00",
+      "end": "2026-07-27T18:39:00-07:00",
+      "source": "manual"
+    }
+  ],
+  "phase_totals_sec": {
+    "thinking": 300,
+    "writing": 540,
+    "reviewing": 120,
+    "debugging": 180
+  },
+  "total_active_sec": 1140,
+  "run_count": 2,
+  "failed_run_count": 1,
+  "submit_count": 1,
+  "logic_idea": "Sort by start; extend the last merged interval when current.start <= last.end.",
+  "tags": [
+    "intervals",
+    "sorting"
+  ],
+  "comments": "",
+  "client": {
+    "extension_version": "0.1.0",
+    "sample": true
+  }
+}

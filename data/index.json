@@ -1,0 +1,806 @@
+{
+ "schema_version": 1,
+ "generated_at": "2026-08-05T04:05:27+00:00",
+ "totals": {
+  "problems": 9,
+  "sessions": 10,
+  "accepted": 8,
+  "gave_up": 2,
+  "abandoned": 0
+ },
+ "problems": [
+  {
+   "dir_key": "0001-two-sum",
+   "slug": "two-sum",
+   "title": "Two Sum",
+   "difficulty": "Easy",
+   "attempts": 1,
+   "solved": true,
+   "gave_up_count": 0,
+   "first_session_at": "2026-07-06T19:10:00-07:00",
+   "last_session_at": "2026-07-06T19:10:00-07:00",
+   "best_total_sec": 780,
+   "tags": [
+    "array",
+    "hash-map"
+   ]
+  },
+  {
+   "dir_key": "0002-add-two-numbers",
+   "slug": "add-two-numbers",
+   "title": "Add Two Numbers",
+   "difficulty": "Medium",
+   "attempts": 1,
+   "solved": true,
+   "gave_up_count": 0,
+   "first_session_at": "2026-07-11T18:40:00-07:00",
+   "last_session_at": "2026-07-11T18:40:00-07:00",
+   "best_total_sec": 2160,
+   "tags": [
+    "carry-arithmetic",
+    "dummy-node",
+    "linked-list"
+   ]
+  },
+  {
+   "dir_key": "0003-longest-substring-without-repeating-characters",
+   "slug": "longest-substring-without-repeating-characters",
+   "title": "Longest Substring Without Repeating Characters",
+   "difficulty": "Medium",
+   "attempts": 1,
+   "solved": true,
+   "gave_up_count": 0,
+   "first_session_at": "2026-07-14T21:00:00-07:00",
+   "last_session_at": "2026-07-14T21:00:00-07:00",
+   "best_total_sec": 2040,
+   "tags": [
+    "hash-map",
+    "sliding-window",
+    "string"
+   ]
+  },
+  {
+   "dir_key": "0020-valid-parentheses",
+   "slug": "valid-parentheses",
+   "title": "Valid Parentheses",
+   "difficulty": "Easy",
+   "attempts": 1,
+   "solved": true,
+   "gave_up_count": 0,
+   "first_session_at": "2026-07-08T20:05:00-07:00",
+   "last_session_at": "2026-07-08T20:05:00-07:00",
+   "best_total_sec": 1020,
+   "tags": [
+    "stack",
+    "string"
+   ]
+  },
+  {
+   "dir_key": "0042-trapping-rain-water",
+   "slug": "trapping-rain-water",
+   "title": "Trapping Rain Water",
+   "difficulty": "Hard",
+   "attempts": 1,
+   "solved": false,
+   "gave_up_count": 1,
+   "first_session_at": "2026-08-02T16:45:00-07:00",
+   "last_session_at": "2026-08-02T16:45:00-07:00",
+   "best_total_sec": null,
+   "tags": [
+    "array",
+    "prefix-max",
+    "two-pointers"
+   ]
+  },
+  {
+   "dir_key": "0056-merge-intervals",
+   "slug": "merge-intervals",
+   "title": "Merge Intervals",
+   "difficulty": "Medium",
+   "attempts": 1,
+   "solved": true,
+   "gave_up_count": 0,
+   "first_session_at": "2026-07-27T18:20:00-07:00",
+   "last_session_at": "2026-07-27T18:20:00-07:00",
+   "best_total_sec": 1140,
+   "tags": [
+    "intervals",
+    "sorting"
+   ]
+  },
+  {
+   "dir_key": "0102-binary-tree-level-order-traversal",
+   "slug": "binary-tree-level-order-traversal",
+   "title": "Binary Tree Level Order Traversal",
+   "difficulty": "Medium",
+   "attempts": 1,
+   "solved": true,
+   "gave_up_count": 0,
+   "first_session_at": "2026-07-30T21:10:00-07:00",
+   "last_session_at": "2026-07-30T21:10:00-07:00",
+   "best_total_sec": 960,
+   "tags": [
+    "bfs",
+    "queue",
+    "tree"
+   ]
+  },
+  {
+   "dir_key": "0207-course-schedule",
+   "slug": "course-schedule",
+   "title": "Course Schedule",
+   "difficulty": "Medium",
+   "attempts": 2,
+   "solved": true,
+   "gave_up_count": 1,
+   "first_session_at": "2026-07-18T15:30:00-07:00",
+   "last_session_at": "2026-07-20T19:15:00-07:00",
+   "best_total_sec": 1440,
+   "tags": [
+    "bfs",
+    "graph",
+    "topological-sort"
+   ]
+  },
+  {
+   "dir_key": "0322-coin-change",
+   "slug": "coin-change",
+   "title": "Coin Change",
+   "difficulty": "Medium",
+   "attempts": 1,
+   "solved": true,
+   "gave_up_count": 0,
+   "first_session_at": "2026-07-23T20:30:00-07:00",
+   "last_session_at": "2026-07-23T20:30:00-07:00",
+   "best_total_sec": 2940,
+   "tags": [
+    "bottom-up",
+    "dp"
+   ]
+  }
+ ],
+ "sessions": [
+  {
+   "session_id": "8044b4d2",
+   "dir_key": "0001-two-sum",
+   "title": "Two Sum",
+   "difficulty": "Easy",
+   "date": "2026-07-06",
+   "started_at": "2026-07-06T19:10:00-07:00",
+   "outcome": "accepted",
+   "attempt_number": 1,
+   "total_active_sec": 780,
+   "phase_totals_sec": {
+    "thinking": 240,
+    "writing": 360,
+    "reviewing": 120,
+    "debugging": 60
+   },
+   "run_count": 2,
+   "failed_run_count": 0,
+   "submit_count": 1,
+   "tags": [
+    "array",
+    "hash-map"
+   ]
+  },
+  {
+   "session_id": "e4fca720",
+   "dir_key": "0020-valid-parentheses",
+   "title": "Valid Parentheses",
+   "difficulty": "Easy",
+   "date": "2026-07-08",
+   "started_at": "2026-07-08T20:05:00-07:00",
+   "outcome": "accepted",
+   "attempt_number": 1,
+   "total_active_sec": 1020,
+   "phase_totals_sec": {
+    "thinking": 180,
+    "writing": 480,
+    "reviewing": 120,
+    "debugging": 240
+   },
+   "run_count": 3,
+   "failed_run_count": 1,
+   "submit_count": 1,
+   "tags": [
+    "stack",
+    "string"
+   ]
+  },
+  {
+   "session_id": "894cf000",
+   "dir_key": "0002-add-two-numbers",
+   "title": "Add Two Numbers",
+   "difficulty": "Medium",
+   "date": "2026-07-11",
+   "started_at": "2026-07-11T18:40:00-07:00",
+   "outcome": "accepted",
+   "attempt_number": 1,
+   "total_active_sec": 2160,
+   "phase_totals_sec": {
+    "thinking": 420,
+    "writing": 780,
+    "reviewing": 120,
+    "debugging": 840
+   },
+   "run_count": 5,
+   "failed_run_count": 3,
+   "submit_count": 2,
+   "tags": [
+    "linked-list",
+    "carry-arithmetic",
+    "dummy-node"
+   ]
+  },
+  {
+   "session_id": "c5d8e497",
+   "dir_key": "0003-longest-substring-without-repeating-characters",
+   "title": "Longest Substring Without Repeating Characters",
+   "difficulty": "Medium",
+   "date": "2026-07-14",
+   "started_at": "2026-07-14T21:00:00-07:00",
+   "outcome": "accepted",
+   "attempt_number": 1,
+   "total_active_sec": 2040,
+   "phase_totals_sec": {
+    "thinking": 600,
+    "writing": 720,
+    "reviewing": 180,
+    "debugging": 540
+   },
+   "run_count": 4,
+   "failed_run_count": 2,
+   "submit_count": 1,
+   "tags": [
+    "sliding-window",
+    "hash-map",
+    "string"
+   ]
+  },
+  {
+   "session_id": "37bb8a19",
+   "dir_key": "0207-course-schedule",
+   "title": "Course Schedule",
+   "difficulty": "Medium",
+   "date": "2026-07-18",
+   "started_at": "2026-07-18T15:30:00-07:00",
+   "outcome": "gave_up",
+   "attempt_number": 1,
+   "total_active_sec": 3300,
+   "phase_totals_sec": {
+    "thinking": 1080,
+    "writing": 900,
+    "reviewing": 0,
+    "debugging": 1320
+   },
+   "run_count": 6,
+   "failed_run_count": 5,
+   "submit_count": 2,
+   "tags": [
+    "graph",
+    "topological-sort",
+    "bfs"
+   ]
+  },
+  {
+   "session_id": "ed9be3e8",
+   "dir_key": "0207-course-schedule",
+   "title": "Course Schedule",
+   "difficulty": "Medium",
+   "date": "2026-07-20",
+   "started_at": "2026-07-20T19:15:00-07:00",
+   "outcome": "accepted",
+   "attempt_number": 2,
+   "total_active_sec": 1440,
+   "phase_totals_sec": {
+    "thinking": 360,
+    "writing": 600,
+    "reviewing": 180,
+    "debugging": 300
+   },
+   "run_count": 3,
+   "failed_run_count": 1,
+   "submit_count": 1,
+   "tags": [
+    "graph",
+    "topological-sort",
+    "bfs"
+   ]
+  },
+  {
+   "session_id": "949ea199",
+   "dir_key": "0322-coin-change",
+   "title": "Coin Change",
+   "difficulty": "Medium",
+   "date": "2026-07-23",
+   "started_at": "2026-07-23T20:30:00-07:00",
+   "outcome": "accepted",
+   "attempt_number": 1,
+   "total_active_sec": 2940,
+   "phase_totals_sec": {
+    "thinking": 900,
+    "writing": 840,
+    "reviewing": 120,
+    "debugging": 1080
+   },
+   "run_count": 7,
+   "failed_run_count": 4,
+   "submit_count": 3,
+   "tags": [
+    "dp",
+    "bottom-up"
+   ]
+  },
+  {
+   "session_id": "f21785fb",
+   "dir_key": "0056-merge-intervals",
+   "title": "Merge Intervals",
+   "difficulty": "Medium",
+   "date": "2026-07-27",
+   "started_at": "2026-07-27T18:20:00-07:00",
+   "outcome": "accepted",
+   "attempt_number": 1,
+   "total_active_sec": 1140,
+   "phase_totals_sec": {
+    "thinking": 300,
+    "writing": 540,
+    "reviewing": 120,
+    "debugging": 180
+   },
+   "run_count": 2,
+   "failed_run_count": 1,
+   "submit_count": 1,
+   "tags": [
+    "intervals",
+    "sorting"
+   ]
+  },
+  {
+   "session_id": "8dd4e9cb",
+   "dir_key": "0102-binary-tree-level-order-traversal",
+   "title": "Binary Tree Level Order Traversal",
+   "difficulty": "Medium",
+   "date": "2026-07-30",
+   "started_at": "2026-07-30T21:10:00-07:00",
+   "outcome": "accepted",
+   "attempt_number": 1,
+   "total_active_sec": 960,
+   "phase_totals_sec": {
+    "thinking": 240,
+    "writing": 480,
+    "reviewing": 120,
+    "debugging": 120
+   },
+   "run_count": 2,
+   "failed_run_count": 0,
+   "submit_count": 1,
+   "tags": [
+    "tree",
+    "bfs",
+    "queue"
+   ]
+  },
+  {
+   "session_id": "208856c1",
+   "dir_key": "0042-trapping-rain-water",
+   "title": "Trapping Rain Water",
+   "difficulty": "Hard",
+   "date": "2026-08-02",
+   "started_at": "2026-08-02T16:45:00-07:00",
+   "outcome": "gave_up",
+   "attempt_number": 1,
+   "total_active_sec": 3420,
+   "phase_totals_sec": {
+    "thinking": 1500,
+    "writing": 720,
+    "reviewing": 0,
+    "debugging": 1200
+   },
+   "run_count": 5,
+   "failed_run_count": 4,
+   "submit_count": 2,
+   "tags": [
+    "two-pointers",
+    "array",
+    "prefix-max"
+   ]
+  }
+ ],
+ "tags": {
+  "array": {
+   "session_count": 2,
+   "problem_count": 2,
+   "accepted": 1,
+   "gave_up": 1,
+   "give_up_rate": 0.5,
+   "avg_total_sec": 2100,
+   "median_total_sec": 2100,
+   "avg_phase_sec": {
+    "thinking": 870,
+    "writing": 540,
+    "reviewing": 60,
+    "debugging": 630
+   },
+   "avg_run_count": 3.5,
+   "avg_failed_run_count": 2,
+   "last_seen": "2026-08-02"
+  },
+  "bfs": {
+   "session_count": 3,
+   "problem_count": 2,
+   "accepted": 2,
+   "gave_up": 1,
+   "give_up_rate": 0.333,
+   "avg_total_sec": 1900,
+   "median_total_sec": 1440,
+   "avg_phase_sec": {
+    "thinking": 560,
+    "writing": 660,
+    "reviewing": 100,
+    "debugging": 580
+   },
+   "avg_run_count": 3.7,
+   "avg_failed_run_count": 2,
+   "last_seen": "2026-07-30"
+  },
+  "bottom-up": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 2940,
+   "median_total_sec": 2940,
+   "avg_phase_sec": {
+    "thinking": 900,
+    "writing": 840,
+    "reviewing": 120,
+    "debugging": 1080
+   },
+   "avg_run_count": 7,
+   "avg_failed_run_count": 4,
+   "last_seen": "2026-07-23"
+  },
+  "carry-arithmetic": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 2160,
+   "median_total_sec": 2160,
+   "avg_phase_sec": {
+    "thinking": 420,
+    "writing": 780,
+    "reviewing": 120,
+    "debugging": 840
+   },
+   "avg_run_count": 5,
+   "avg_failed_run_count": 3,
+   "last_seen": "2026-07-11"
+  },
+  "dp": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 2940,
+   "median_total_sec": 2940,
+   "avg_phase_sec": {
+    "thinking": 900,
+    "writing": 840,
+    "reviewing": 120,
+    "debugging": 1080
+   },
+   "avg_run_count": 7,
+   "avg_failed_run_count": 4,
+   "last_seen": "2026-07-23"
+  },
+  "dummy-node": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 2160,
+   "median_total_sec": 2160,
+   "avg_phase_sec": {
+    "thinking": 420,
+    "writing": 780,
+    "reviewing": 120,
+    "debugging": 840
+   },
+   "avg_run_count": 5,
+   "avg_failed_run_count": 3,
+   "last_seen": "2026-07-11"
+  },
+  "graph": {
+   "session_count": 2,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 1,
+   "give_up_rate": 0.5,
+   "avg_total_sec": 2370,
+   "median_total_sec": 2370,
+   "avg_phase_sec": {
+    "thinking": 720,
+    "writing": 750,
+    "reviewing": 90,
+    "debugging": 810
+   },
+   "avg_run_count": 4.5,
+   "avg_failed_run_count": 3,
+   "last_seen": "2026-07-20"
+  },
+  "hash-map": {
+   "session_count": 2,
+   "problem_count": 2,
+   "accepted": 2,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 1410,
+   "median_total_sec": 1410,
+   "avg_phase_sec": {
+    "thinking": 420,
+    "writing": 540,
+    "reviewing": 150,
+    "debugging": 300
+   },
+   "avg_run_count": 3,
+   "avg_failed_run_count": 1,
+   "last_seen": "2026-07-14"
+  },
+  "intervals": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 1140,
+   "median_total_sec": 1140,
+   "avg_phase_sec": {
+    "thinking": 300,
+    "writing": 540,
+    "reviewing": 120,
+    "debugging": 180
+   },
+   "avg_run_count": 2,
+   "avg_failed_run_count": 1,
+   "last_seen": "2026-07-27"
+  },
+  "linked-list": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 2160,
+   "median_total_sec": 2160,
+   "avg_phase_sec": {
+    "thinking": 420,
+    "writing": 780,
+    "reviewing": 120,
+    "debugging": 840
+   },
+   "avg_run_count": 5,
+   "avg_failed_run_count": 3,
+   "last_seen": "2026-07-11"
+  },
+  "prefix-max": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 0,
+   "gave_up": 1,
+   "give_up_rate": 1.0,
+   "avg_total_sec": 3420,
+   "median_total_sec": 3420,
+   "avg_phase_sec": {
+    "thinking": 1500,
+    "writing": 720,
+    "reviewing": 0,
+    "debugging": 1200
+   },
+   "avg_run_count": 5,
+   "avg_failed_run_count": 4,
+   "last_seen": "2026-08-02"
+  },
+  "queue": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 960,
+   "median_total_sec": 960,
+   "avg_phase_sec": {
+    "thinking": 240,
+    "writing": 480,
+    "reviewing": 120,
+    "debugging": 120
+   },
+   "avg_run_count": 2,
+   "avg_failed_run_count": 0,
+   "last_seen": "2026-07-30"
+  },
+  "sliding-window": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 2040,
+   "median_total_sec": 2040,
+   "avg_phase_sec": {
+    "thinking": 600,
+    "writing": 720,
+    "reviewing": 180,
+    "debugging": 540
+   },
+   "avg_run_count": 4,
+   "avg_failed_run_count": 2,
+   "last_seen": "2026-07-14"
+  },
+  "sorting": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 1140,
+   "median_total_sec": 1140,
+   "avg_phase_sec": {
+    "thinking": 300,
+    "writing": 540,
+    "reviewing": 120,
+    "debugging": 180
+   },
+   "avg_run_count": 2,
+   "avg_failed_run_count": 1,
+   "last_seen": "2026-07-27"
+  },
+  "stack": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 1020,
+   "median_total_sec": 1020,
+   "avg_phase_sec": {
+    "thinking": 180,
+    "writing": 480,
+    "reviewing": 120,
+    "debugging": 240
+   },
+   "avg_run_count": 3,
+   "avg_failed_run_count": 1,
+   "last_seen": "2026-07-08"
+  },
+  "string": {
+   "session_count": 2,
+   "problem_count": 2,
+   "accepted": 2,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 1530,
+   "median_total_sec": 1530,
+   "avg_phase_sec": {
+    "thinking": 390,
+    "writing": 600,
+    "reviewing": 150,
+    "debugging": 390
+   },
+   "avg_run_count": 3.5,
+   "avg_failed_run_count": 1.5,
+   "last_seen": "2026-07-14"
+  },
+  "topological-sort": {
+   "session_count": 2,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 1,
+   "give_up_rate": 0.5,
+   "avg_total_sec": 2370,
+   "median_total_sec": 2370,
+   "avg_phase_sec": {
+    "thinking": 720,
+    "writing": 750,
+    "reviewing": 90,
+    "debugging": 810
+   },
+   "avg_run_count": 4.5,
+   "avg_failed_run_count": 3,
+   "last_seen": "2026-07-20"
+  },
+  "tree": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 1,
+   "gave_up": 0,
+   "give_up_rate": 0.0,
+   "avg_total_sec": 960,
+   "median_total_sec": 960,
+   "avg_phase_sec": {
+    "thinking": 240,
+    "writing": 480,
+    "reviewing": 120,
+    "debugging": 120
+   },
+   "avg_run_count": 2,
+   "avg_failed_run_count": 0,
+   "last_seen": "2026-07-30"
+  },
+  "two-pointers": {
+   "session_count": 1,
+   "problem_count": 1,
+   "accepted": 0,
+   "gave_up": 1,
+   "give_up_rate": 1.0,
+   "avg_total_sec": 3420,
+   "median_total_sec": 3420,
+   "avg_phase_sec": {
+    "thinking": 1500,
+    "writing": 720,
+    "reviewing": 0,
+    "debugging": 1200
+   },
+   "avg_run_count": 5,
+   "avg_failed_run_count": 4,
+   "last_seen": "2026-08-02"
+  }
+ },
+ "daily": {
+  "2026-07-06": {
+   "sessions": 1,
+   "accepted": 1,
+   "active_sec": 780
+  },
+  "2026-07-08": {
+   "sessions": 1,
+   "accepted": 1,
+   "active_sec": 1020
+  },
+  "2026-07-11": {
+   "sessions": 1,
+   "accepted": 1,
+   "active_sec": 2160
+  },
+  "2026-07-14": {
+   "sessions": 1,
+   "accepted": 1,
+   "active_sec": 2040
+  },
+  "2026-07-18": {
+   "sessions": 1,
+   "accepted": 0,
+   "active_sec": 3300
+  },
+  "2026-07-20": {
+   "sessions": 1,
+   "accepted": 1,
+   "active_sec": 1440
+  },
+  "2026-07-23": {
+   "sessions": 1,
+   "accepted": 1,
+   "active_sec": 2940
+  },
+  "2026-07-27": {
+   "sessions": 1,
+   "accepted": 1,
+   "active_sec": 1140
+  },
+  "2026-07-30": {
+   "sessions": 1,
+   "accepted": 1,
+   "active_sec": 960
+  },
+  "2026-08-02": {
+   "sessions": 1,
+   "accepted": 0,
+   "active_sec": 3420
+  }
+ }
+}

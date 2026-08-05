@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "LeetLens",
+  "description": "Track how you solve LeetCode: phase timing, run counts, notes and tags, committed to GitHub.",
+  "version": "0.1.0",
+  "permissions": ["storage"],
+  "host_permissions": ["https://leetcode.com/*", "https://api.github.com/*"],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://leetcode.com/problems/*"],
+      "js": ["src/inject/main-world.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://leetcode.com/problems/*"],
+      "js": ["src/content/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/panel.js",
+        "src/content/panel.css.js",
+        "src/state/session-machine.js",
+        "src/lib/leetcode-endpoints.js"
+      ],
+      "matches": ["https://leetcode.com/*"]
+    }
+  ]
+}

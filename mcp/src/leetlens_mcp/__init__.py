@@ -1,0 +1,1 @@
+"""LeetLens MCP server package."""

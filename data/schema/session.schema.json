@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/g7xu/leetlens/main/data/schema/session.schema.json",
+  "title": "LeetLens solving session",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "session_id",
+    "problem",
+    "started_at",
+    "ended_at",
+    "outcome",
+    "phases",
+    "phase_totals_sec",
+    "total_active_sec",
+    "run_count",
+    "failed_run_count",
+    "submit_count",
+    "tags"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]{8}$",
+      "description": "Random 8-char id, also part of the filename"
+    },
+    "problem": {
+      "type": "object",
+      "required": ["frontend_id", "dir_key", "slug", "title", "difficulty", "url"],
+      "properties": {
+        "frontend_id": { "type": "string", "description": "LeetCode question frontend id, e.g. \"2\"" },
+        "dir_key": {
+          "type": "string",
+          "pattern": "^[0-9]{4,}-[a-z0-9-]+$",
+          "description": "Zero-padded id + slug, matches LeetHub folder naming"
+        },
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "difficulty": { "enum": ["Easy", "Medium", "Hard"] },
+        "url": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    },
+    "language": { "type": "string", "description": "LeetCode language slug, e.g. python3" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "ended_at": { "type": "string", "format": "date-time" },
+    "outcome": {
+      "enum": ["accepted", "gave_up", "abandoned"],
+      "description": "accepted = solved; gave_up = explicit give-up; abandoned = session left open and flushed later"
+    },
+    "phases": {
+      "type": "array",
+      "description": "Ordered, non-overlapping segments; gaps allowed (page reloads etc.)",
+      "items": {
+        "type": "object",
+        "required": ["phase", "start", "end", "source"],
+        "properties": {
+          "phase": { "enum": ["thinking", "writing", "reviewing", "debugging"] },
+          "start": { "type": "string", "format": "date-time" },
+          "end": { "type": "string", "format": "date-time" },
+          "source": { "enum": ["auto", "manual"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "phase_totals_sec": {
+      "type": "object",
+      "required": ["thinking", "writing", "reviewing", "debugging"],
+      "properties": {
+        "thinking": { "type": "integer", "minimum": 0 },
+        "writing": { "type": "integer", "minimum": 0 },
+        "reviewing": { "type": "integer", "minimum": 0 },
+        "debugging": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "total_active_sec": { "type": "integer", "minimum": 0 },
+    "run_count": { "type": "integer", "minimum": 0 },
+    "failed_run_count": { "type": "integer", "minimum": 0 },
+    "submit_count": { "type": "integer", "minimum": 0 },
+    "logic_idea": { "type": "string" },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "description": "User-created tags, kebab-case"
+    },
+    "comments": { "type": "string" },
+    "client": {
+      "type": "object",
+      "properties": { "extension_version": { "type": "string" } },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
