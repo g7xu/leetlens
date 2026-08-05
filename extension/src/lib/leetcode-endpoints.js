@@ -17,9 +17,15 @@ const QUESTION_QUERY = `
       questionFrontendId
       title
       difficulty
+      topicTags { slug }
     }
   }`;
 
+/**
+ * Problem metadata plus LeetCode's own topic tags. topic_tags is returned
+ * alongside (not inside) the problem object because the session schema
+ * forbids extra properties on `problem` — callers keep them separate.
+ */
 export async function fetchProblemMeta(slug) {
   const resp = await fetch('https://leetcode.com/graphql/', {
     method: 'POST',
@@ -30,12 +36,15 @@ export async function fetchProblemMeta(slug) {
   if (!q) throw new Error(`LeetCode GraphQL returned no question for ${slug}`);
   const dirKey = `${String(q.questionFrontendId).padStart(4, '0')}-${slug}`;
   return {
-    frontend_id: String(q.questionFrontendId),
-    dir_key: dirKey,
-    slug,
-    title: q.title,
-    difficulty: q.difficulty,
-    url: `https://leetcode.com/problems/${slug}/`,
+    problem: {
+      frontend_id: String(q.questionFrontendId),
+      dir_key: dirKey,
+      slug,
+      title: q.title,
+      difficulty: q.difficulty,
+      url: `https://leetcode.com/problems/${slug}/`,
+    },
+    topic_tags: (q.topicTags ?? []).map((t) => t.slug),
   };
 }
 

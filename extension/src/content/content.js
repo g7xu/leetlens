@@ -22,10 +22,24 @@
   let heartbeatId = null;
 
   const storageKey = (slug) => `session:${slug}`;
+  let currentTopicTags = []; // LeetCode's own topic tags for the current problem
 
   async function getKnownTags() {
     const { knownTags = [] } = await chrome.storage.local.get('knownTags');
     return knownTags;
+  }
+
+  /** Save-form suggestions: locally used tags, then the repo's tag vocabulary
+   *  (works on a fresh profile), then LeetCode's topic tags for this problem. */
+  async function getSuggestedTags() {
+    const local = await getKnownTags();
+    let repoTags = [];
+    try {
+      repoTags = (await chrome.runtime.sendMessage({ type: 'GET_REPO_TAGS' }))?.tags ?? [];
+    } catch {
+      /* service worker unavailable — local suggestions still work */
+    }
+    return [...new Set([...local, ...repoTags, ...currentTopicTags])];
   }
 
   async function rememberTags(tags) {
@@ -62,7 +76,7 @@
     machine.end(outcome);
     machine.language = endpoints.detectLanguage();
     persist();
-    panel.showSaveForm(machine, await getKnownTags());
+    panel.showSaveForm(machine, await getSuggestedTags());
   }
 
   function freshSession(problem) {
@@ -101,7 +115,9 @@
     currentSlug = slug;
     let problem;
     try {
-      problem = await endpoints.fetchProblemMeta(slug);
+      const meta = await endpoints.fetchProblemMeta(slug);
+      problem = meta.problem;
+      currentTopicTags = meta.topic_tags;
     } catch {
       return; // not a solvable problem page (or GraphQL changed) — stay out of the way
     }
@@ -123,7 +139,7 @@
       onResumeAbandon: async () => {
         machine.end('abandoned');
         machine.language = endpoints.detectLanguage();
-        panel.showSaveForm(machine, await getKnownTags());
+        panel.showSaveForm(machine, await getSuggestedTags());
       },
       onResumeDiscard: async () => { await clearStored(currentSlug); freshSession(problem); },
     });
@@ -144,7 +160,7 @@
       machine = SessionMachine.fromSnapshot(stored);
       machine.outcome = stored.outcome;
       machine.endedAt = stored.endedAt ?? stored.heartbeat;
-      panel.showSaveForm(machine, await getKnownTags());
+      panel.showSaveForm(machine, await getSuggestedTags());
     } else {
       machine = new SessionMachine(problem);
       persist();
