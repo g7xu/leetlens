@@ -1,10 +1,10 @@
 {
  "schema_version": 1,
- "generated_at": "2026-08-05T04:43:46+00:00",
+ "generated_at": "2026-08-05T05:01:02+00:00",
  "totals": {
-  "problems": 9,
-  "sessions": 10,
-  "accepted": 8,
+  "problems": 10,
+  "sessions": 11,
+  "accepted": 9,
   "gave_up": 2,
   "abandoned": 0
  },
@@ -157,6 +157,19 @@
     "bottom-up",
     "dp"
    ]
+  },
+  {
+   "dir_key": "0704-binary-search",
+   "slug": "binary-search",
+   "title": "Binary Search",
+   "difficulty": "Easy",
+   "attempts": 1,
+   "solved": true,
+   "gave_up_count": 0,
+   "first_session_at": "2026-08-05T04:55:50.740Z",
+   "last_session_at": "2026-08-05T04:55:50.740Z",
+   "best_total_sec": 282,
+   "tags": []
   }
  ],
  "sessions": [
@@ -405,6 +418,27 @@
     "array",
     "prefix-max"
    ]
+  },
+  {
+   "session_id": "c45375b9",
+   "dir_key": "0704-binary-search",
+   "title": "Binary Search",
+   "difficulty": "Easy",
+   "date": "2026-08-05",
+   "started_at": "2026-08-05T04:55:50.740Z",
+   "outcome": "accepted",
+   "attempt_number": 1,
+   "total_active_sec": 282,
+   "phase_totals_sec": {
+    "thinking": 0,
+    "writing": 126,
+    "reviewing": 96,
+    "debugging": 60
+   },
+   "run_count": 5,
+   "failed_run_count": 3,
+   "submit_count": 2,
+   "tags": []
   }
  ],
  "tags": {
@@ -801,6 +835,11 @@
    "sessions": 1,
    "accepted": 0,
    "active_sec": 3420
+  },
+  "2026-08-05": {
+   "sessions": 1,
+   "accepted": 1,
+   "active_sec": 282
   }
  }
 }
