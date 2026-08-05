@@ -20,6 +20,21 @@
     window.postMessage({ source: SOURCE, type, payload }, window.location.origin);
   }
 
+  // Run/submit request bodies carry the editor contents as typed_code — the
+  // reliable way to capture the user's code without scraping Monaco.
+  function codeFromBody(body) {
+    if (typeof body !== 'string') return {};
+    try {
+      const data = JSON.parse(body);
+      if (typeof data.typed_code === 'string' && data.typed_code.trim()) {
+        return { code: data.typed_code, lang: data.lang ?? null };
+      }
+    } catch {
+      /* not JSON */
+    }
+    return {};
+  }
+
   function handleCheckResponse(id, data) {
     if (!data || data.state !== 'SUCCESS' || reportedChecks.has(id)) return;
     reportedChecks.add(id);
@@ -41,16 +56,16 @@
     }
   }
 
-  async function inspect(url, response) {
+  async function inspect(url, response, requestBody) {
     try {
       if (RUN_URL.test(url)) {
         const data = await response.clone().json();
         if (data.interpret_id) pendingRuns.add(data.interpret_id);
-        emit('RUN_STARTED');
+        emit('RUN_STARTED', codeFromBody(requestBody));
       } else if (SUBMIT_URL.test(url)) {
         const data = await response.clone().json();
         if (data.submission_id) pendingSubmits.add(String(data.submission_id));
-        emit('SUBMIT_STARTED');
+        emit('SUBMIT_STARTED', codeFromBody(requestBody));
       } else {
         const m = url.match(CHECK_URL);
         if (m) handleCheckResponse(m[1], await response.clone().json());
@@ -64,7 +79,7 @@
   window.fetch = async function (...args) {
     const response = await originalFetch.apply(this, args);
     const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
-    if (url) inspect(url, response);
+    if (url) inspect(url, response, args[1]?.body);
     return response;
   };
 
@@ -75,6 +90,7 @@
     return originalOpen.call(this, method, url, ...rest);
   };
   XMLHttpRequest.prototype.send = function (...args) {
+    const requestBody = args[0];
     this.addEventListener('load', () => {
       const url = this.__leetlensUrl;
       if (!url) return;
@@ -82,11 +98,11 @@
         if (RUN_URL.test(url)) {
           const data = JSON.parse(this.responseText);
           if (data.interpret_id) pendingRuns.add(data.interpret_id);
-          emit('RUN_STARTED');
+          emit('RUN_STARTED', codeFromBody(requestBody));
         } else if (SUBMIT_URL.test(url)) {
           const data = JSON.parse(this.responseText);
           if (data.submission_id) pendingSubmits.add(String(data.submission_id));
-          emit('SUBMIT_STARTED');
+          emit('SUBMIT_STARTED', codeFromBody(requestBody));
         } else {
           const m = url.match(CHECK_URL);
           if (m) handleCheckResponse(m[1], JSON.parse(this.responseText));

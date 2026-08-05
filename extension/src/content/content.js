@@ -76,8 +76,11 @@
     panel.setSaving(true);
     panel.setStatus('');
     const record = machine.toRecord({ ...values, extensionVersion: VERSION });
+    const code = machine.typedCode
+      ? { content: machine.typedCode, lang: machine.codeLang ?? machine.language ?? 'unknown' }
+      : null;
     try {
-      const resp = await chrome.runtime.sendMessage({ type: 'COMMIT_SESSION', record });
+      const resp = await chrome.runtime.sendMessage({ type: 'COMMIT_SESSION', record, code });
       if (resp?.ok) {
         await rememberTags(values.tags);
         await clearStored(currentSlug);
@@ -176,9 +179,15 @@
     }
     if (!machine || machine.ended) return;
     switch (type) {
-      case 'RUN_STARTED': machine.runStarted(); break;
+      case 'RUN_STARTED':
+        machine.runStarted();
+        machine.captureCode(payload.code, payload.lang);
+        break;
       case 'RUN_RESULT': machine.runResult(payload.passed); break;
-      case 'SUBMIT_STARTED': machine.submitStarted(); break;
+      case 'SUBMIT_STARTED':
+        machine.submitStarted();
+        machine.captureCode(payload.code, payload.lang);
+        break;
       case 'SUBMIT_RESULT':
         if (payload.accepted) { endSession('accepted'); return; }
         machine.submitResult(false);
