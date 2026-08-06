@@ -201,6 +201,11 @@ export class Panel {
     for (const phase of PHASES) {
       this.totalInputs[phase].value = (totals[phase] / 60).toFixed(1);
     }
+    // Thinking-area notes (extracted from the editor's comment block) become
+    // the logic-idea draft; never clobber edits already made in the form.
+    if (!this.logicIdea.value.trim() && machine.notes?.trim()) {
+      this.logicIdea.value = machine.notes;
+    }
     this.suggestions.replaceChildren(
       ...knownTags.filter((t) => !this.tags.includes(t)).slice(0, 12).map((tag) => {
         const chip = el('span', { className: 'chip', textContent: `+ ${tag}` });

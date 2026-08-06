@@ -114,6 +114,57 @@
     return originalSend.apply(this, args);
   };
 
+  // -- thinking area -----------------------------------------------------
+  // Prepend a comment block to the top of the code editor so the approach
+  // gets sketched where the user already is — in the editor — before coding.
+  // The content script later strips this block from the captured code and
+  // turns it into the session's logic-idea draft.
+
+  function commentToken(langId) {
+    if (['python', 'ruby', 'shell', 'perl', 'r', 'elixir'].includes(langId)) return '#';
+    if (['sql', 'mysql', 'pgsql'].includes(langId)) return '--';
+    if (langId === 'racket' || langId === 'scheme') return ';';
+    return '//';
+  }
+
+  const THINK_HEADER_RE = /^\s*(?:#|\/\/|--|;)\s*Thinking area\b/im;
+  const NON_CODE_LANGS = new Set(['plaintext', 'json', 'markdown']);
+  const injectedKeys = new Set();
+
+  function thinkingBlock(langId) {
+    const token = commentToken(langId);
+    const delim = token[0].repeat(18);
+    return `${token} Thinking area\n${delim}\n\n\n\n${delim}\n\n`;
+  }
+
+  function ensureThinkingArea() {
+    const models = window.monaco?.editor?.getModels?.();
+    if (!models) return;
+    const slug = (window.location.pathname.match(/^\/problems\/([^/]+)/) || [])[1];
+    if (!slug) return;
+    for (const model of models) {
+      try {
+        const lang = model.getLanguageId?.();
+        if (!lang || NON_CODE_LANGS.has(lang)) continue;
+        const key = `${slug}:${lang}`;
+        if (injectedKeys.has(key)) continue; // once per problem+language: deleting it is respected
+        const value = model.getValue();
+        if (!value.trim()) continue; // template not loaded yet — retry next tick
+        injectedKeys.add(key);
+        if (THINK_HEADER_RE.test(value)) continue; // restored by LeetCode's own cloud save
+        model.pushEditOperations(
+          [],
+          [{ range: new window.monaco.Range(1, 1, 1, 1), text: thinkingBlock(lang) }],
+          () => null,
+        );
+      } catch {
+        /* never let injection break the editor */
+      }
+    }
+  }
+
+  setInterval(ensureThinkingArea, 1000);
+
   // LeetCode is a SPA: surface URL changes so the tracker can switch problems.
   const emitUrlChange = () => emit('URL_CHANGED', { href: window.location.href });
   const originalPushState = history.pushState;

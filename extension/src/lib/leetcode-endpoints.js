@@ -48,6 +48,38 @@ export async function fetchProblemMeta(slug) {
   };
 }
 
+const THINK_HEADER_RE = /^\s*(#|\/\/|--|;)\s*Thinking area\b/i;
+const THINK_DELIM_RE = /^[#/;-]{8,}$/;
+
+/**
+ * Split the thinking-area comment block (injected by main-world.js) off the
+ * top of captured code. Returns the notes written inside the block and the
+ * code with the block removed; code passes through untouched when no block
+ * starts at the first non-blank line.
+ */
+export function extractThinkingArea(code) {
+  if (typeof code !== 'string' || !code) return { notes: '', code: code ?? '' };
+  const lines = code.split('\n');
+  let head = 0;
+  while (head < lines.length && !lines[head].trim()) head++;
+  const open = head + 1;
+  if (!THINK_HEADER_RE.test(lines[head] ?? '') ||
+      !THINK_DELIM_RE.test((lines[open] ?? '').trim())) {
+    return { notes: '', code };
+  }
+  let close = open + 1;
+  while (close < lines.length && !THINK_DELIM_RE.test(lines[close].trim())) close++;
+  if (close >= lines.length) return { notes: '', code };
+  const notes = lines
+    .slice(open + 1, close)
+    .map((line) => line.replace(/^\s*(#|\/\/|--|;)\s?/, ''))
+    .join('\n')
+    .trim();
+  let rest = close + 1;
+  while (rest < lines.length && !lines[rest].trim()) rest++;
+  return { notes, code: lines.slice(rest).join('\n') };
+}
+
 export function detectLanguage() {
   // LeetCode remembers the editor language here; best-effort only.
   try {
