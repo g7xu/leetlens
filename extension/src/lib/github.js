@@ -54,6 +54,21 @@ export async function putFile(path, content, message, { overwrite = false } = {}
   return resp.json();
 }
 
+/**
+ * Fetch a repo file's raw contents via the Contents API (works for private
+ * repos, unlike raw.githubusercontent.com). Returns null when unconfigured
+ * or the file doesn't exist.
+ */
+export async function getFileRaw(path) {
+  const { token, owner, repo, branch } = await getSettings();
+  if (!token || !owner || !repo) return null;
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}`;
+  const resp = await fetch(url, {
+    headers: { ...headers(token), Accept: 'application/vnd.github.raw+json' },
+  });
+  return resp.ok ? resp.text() : null;
+}
+
 /** Used by the options page "Test connection" button. */
 export async function testConnection(settings) {
   const { token, owner, repo } = settings;
