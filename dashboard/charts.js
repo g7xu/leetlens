@@ -49,7 +49,7 @@ export function buildCharts(rows, t) {
   solveTrend(rows, t);
   tagMix(rows, t);
   giveUpByTag(rows, t);
-  runHistogram(rows, t);
+  debuggingTrend(rows, t);
 }
 
 // Stacked bar: one bar per session, minutes per phase.
@@ -194,22 +194,46 @@ function giveUpByTag(rows, t) {
   });
 }
 
-// Histogram of run counts.
-function runHistogram(rows, t) {
-  const buckets = Array(11).fill(0);
-  for (const s of rows) buckets[Math.min(s.run_count, 10)] += 1;
+// ISO week key (YYYY-Www), matching the MCP server's weekly grouping.
+function isoWeek(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3); // Thursday decides the week's year
+  const jan4 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((d - jan4) / 86400_000 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+// Line: weekly average % of session time spent debugging — the single best
+// "am I getting cleaner?" signal.
+function debuggingTrend(rows, t) {
+  const weeks = {};
+  for (const s of rows) {
+    if (!s.total_active_sec) continue;
+    (weeks[isoWeek(s.date)] ??= []).push(s.phase_totals_sec.debugging / s.total_active_sec);
+  }
+  const labels = Object.keys(weeks).sort();
+  const values = labels.map((w) => {
+    const shares = weeks[w];
+    return (shares.reduce((sum, v) => sum + v, 0) / shares.length) * 100;
+  });
   const options = baseOptions(t);
   options.plugins.legend.display = false;
-  options.scales.y.ticks.precision = 0;
-  make('runChart', {
-    type: 'bar',
+  options.plugins.tooltip.callbacks = {
+    label: (ctx) => ` ${ctx.parsed.y.toFixed(0)}% of session time`,
+  };
+  options.scales.y.ticks.callback = (v) => `${v}%`;
+  make('debugChart', {
+    type: 'line',
     data: {
-      labels: buckets.map((_, i) => (i === 10 ? '10+' : String(i))),
+      labels,
       datasets: [{
-        data: buckets,
-        backgroundColor: t.accent,
-        borderRadius: 3,
-        maxBarThickness: 26,
+        label: 'debugging share',
+        data: values,
+        borderColor: t.phases.debugging,
+        backgroundColor: t.phases.debugging,
+        borderWidth: 2,
+        pointRadius: 4,
+        tension: 0.25,
       }],
     },
     options,
