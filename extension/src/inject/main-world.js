@@ -120,14 +120,18 @@
   // The content script later strips this block from the captured code and
   // turns it into the session's logic-idea draft.
 
+  // LeetCode registers Monaco languages under its own slugs (model
+  // .getLanguageId() returns 'python3', 'golang', 'oraclesql', …), so match
+  // those — not Monaco's standard ids.
   function commentToken(langId) {
-    if (['python', 'ruby', 'shell', 'perl', 'r', 'elixir'].includes(langId)) return '#';
-    if (['sql', 'mysql', 'pgsql'].includes(langId)) return '--';
-    if (langId === 'racket' || langId === 'scheme') return ';';
+    if (['python', 'python3', 'ruby', 'elixir', 'bash', 'shell'].includes(langId)) return '#';
+    if (['sql', 'mysql', 'mssql', 'oraclesql', 'postgresql', 'pgsql'].includes(langId)) return '--';
+    if (['racket', 'scheme', 'lisp'].includes(langId)) return ';';
+    if (langId === 'erlang') return '%';
     return '//';
   }
 
-  const THINK_HEADER_RE = /^\s*(?:#|\/\/|--|;)\s*Thinking area\b/im;
+  const THINK_HEADER_RE = /^\s*(?:#|\/\/|--|;|%)\s*Thinking area\b/im;
   const NON_CODE_LANGS = new Set(['plaintext', 'json', 'markdown']);
   const injectedKeys = new Set();
 
