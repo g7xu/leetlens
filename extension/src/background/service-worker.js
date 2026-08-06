@@ -13,13 +13,46 @@ function commitMessage(record) {
   return `session: ${record.problem.dir_key} (${record.outcome}, ${mins}m)`;
 }
 
+// LeetCode language slug -> file extension (LeetHub layout: <dir_key>/<dir_key>.<ext>).
+const LANG_EXT = {
+  python: 'py', python3: 'py', cpp: 'cpp', c: 'c', java: 'java',
+  javascript: 'js', typescript: 'ts', golang: 'go', rust: 'rs',
+  csharp: 'cs', kotlin: 'kt', swift: 'swift', ruby: 'rb', scala: 'scala',
+  php: 'php', dart: 'dart', racket: 'rkt', erlang: 'erl', elixir: 'ex',
+  mysql: 'sql', mssql: 'sql', oraclesql: 'sql', postgresql: 'sql',
+};
+
+function codePath(record, lang) {
+  const ext = LANG_EXT[lang] ?? 'txt';
+  return `${record.problem.dir_key}/${record.problem.dir_key}.${ext}`;
+}
+
 async function commitRecord(record) {
   return putFile(sessionPath(record), JSON.stringify(record, null, 2) + '\n', commitMessage(record));
 }
 
-async function enqueue(record) {
+async function commitCode(record, code) {
+  const content = code.content.endsWith('\n') ? code.content : code.content + '\n';
+  return putFile(codePath(record, code.lang), content,
+    `solution: ${record.problem.dir_key} (${code.lang})`, { overwrite: true });
+}
+
+/**
+ * Commit a queue entry: session JSON first, then the solution code if captured.
+ * `sessionSaved` makes retries idempotent — a retry after a code-only failure
+ * must not commit the session file twice.
+ */
+async function commitEntry(entry) {
+  if (!entry.sessionSaved) {
+    await commitRecord(entry.record);
+    entry.sessionSaved = true;
+  }
+  if (entry.code) await commitCode(entry.record, entry.code);
+}
+
+async function enqueue(entry) {
   const { pendingCommits = [] } = await chrome.storage.local.get('pendingCommits');
-  pendingCommits.push(record);
+  pendingCommits.push(entry);
   await chrome.storage.local.set({ pendingCommits });
 }
 
@@ -28,12 +61,14 @@ async function flushQueue() {
   if (!pendingCommits.length) return { flushed: 0, remaining: 0 };
   const remaining = [];
   let flushed = 0;
-  for (const record of pendingCommits) {
+  for (const item of pendingCommits) {
+    // Entries queued before solution-code support were bare records.
+    const entry = item.record ? item : { record: item, code: null, sessionSaved: false };
     try {
-      await commitRecord(record);
+      await commitEntry(entry);
       flushed += 1;
     } catch {
-      remaining.push(record);
+      remaining.push(entry);
     }
   }
   await chrome.storage.local.set({ pendingCommits: remaining });
@@ -44,8 +79,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     switch (message.type) {
       case 'COMMIT_SESSION': {
+        const entry = { record: message.record, code: message.code ?? null, sessionSaved: false };
         try {
-          await commitRecord(message.record);
+          await commitEntry(entry);
           sendResponse({ ok: true });
         } catch (err) {
           const text = String(err);
@@ -55,7 +91,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
               text.includes('GitHub 403') || text.includes('GitHub 404')) {
             sendResponse({ ok: false, error: text });
           } else {
-            await enqueue(message.record);
+            await enqueue(entry);
             sendResponse({ ok: false, queued: true, error: text });
           }
         }
