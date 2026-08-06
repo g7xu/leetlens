@@ -129,6 +129,7 @@ export class Panel {
     const discardBtn = el('button', { className: 'btn-secondary', textContent: 'Discard' });
     discardBtn.addEventListener('click', () => this.cb.onDiscard());
     this.status = el('div', { className: 'status' });
+    this.savedActions = el('div', { className: 'actions hidden', style: 'margin-top:8px' });
     this.saveBtn = saveBtn;
     this.saveForm = el('div', { className: 'save-form hidden' }, [
       this.outcomeLabel,
@@ -144,6 +145,7 @@ export class Panel {
       this.comments,
       el('div', { className: 'actions', style: 'margin-top:10px' }, [saveBtn, discardBtn]),
       this.status,
+      this.savedActions,
     ]);
 
     // resume prompt -------------------------------------------------------
@@ -190,6 +192,7 @@ export class Panel {
     this.liveView.classList.add('hidden');
     this.resumePrompt.classList.add('hidden');
     this.saveForm.classList.remove('hidden');
+    this.hideSavedActions();
     this.outcomeLabel.textContent =
       machine.outcome === 'accepted' ? '✓ Accepted' :
       machine.outcome === 'gave_up' ? 'Gave up — logging it is still a win' : machine.outcome;
@@ -211,6 +214,28 @@ export class Panel {
     this.saveForm.classList.add('hidden');
     this.resumePrompt.classList.add('hidden');
     this.liveView.classList.remove('hidden');
+    this.hideSavedActions();
+    this.setStatus('');
+  }
+
+  /** Post-save actions: return to the page the user came from, or start over. */
+  showSavedActions({ canGoBack, onBack, onNewSession }) {
+    const buttons = [];
+    if (canGoBack) {
+      const back = el('button', { className: 'btn-finish', textContent: '← Back to list' });
+      back.addEventListener('click', onBack);
+      buttons.push(back);
+    }
+    const fresh = el('button', { className: 'btn-secondary', textContent: 'New session' });
+    fresh.addEventListener('click', onNewSession);
+    buttons.push(fresh);
+    this.savedActions.replaceChildren(...buttons);
+    this.savedActions.classList.remove('hidden');
+  }
+
+  hideSavedActions() {
+    this.savedActions.classList.add('hidden');
+    this.savedActions.replaceChildren();
   }
 
   showResumePrompt(ageMinutes) {

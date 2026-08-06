@@ -78,15 +78,28 @@
     const record = machine.toRecord({ ...values, extensionVersion: VERSION });
     try {
       const resp = await chrome.runtime.sendMessage({ type: 'COMMIT_SESSION', record });
-      if (resp?.ok) {
+      if (resp?.ok || resp?.queued) {
         await rememberTags(values.tags);
         await clearStored(currentSlug);
-        panel.setStatus('Saved to GitHub ✓', 'ok');
-        setTimeout(() => freshSession(machine.problem), 1500);
-      } else if (resp?.queued) {
-        await rememberTags(values.tags);
-        await clearStored(currentSlug);
-        panel.setStatus('Offline — queued, will retry automatically', 'warn');
+        const problem = machine.problem;
+        // Null the machine so navigating away can't re-persist the already
+        // saved session as "ended but never saved".
+        machine = null;
+        panel.setStatus(
+          resp.ok ? 'Saved to GitHub ✓' : 'Offline — queued, will retry automatically',
+          resp.ok ? 'ok' : 'warn',
+        );
+        // The user usually wants to go back to where they came from (problem
+        // list, study plan). Offer it instead of navigating automatically.
+        if (window.history.length > 1) {
+          panel.showSavedActions({
+            canGoBack: true,
+            onBack: () => window.history.back(),
+            onNewSession: () => freshSession(problem),
+          });
+        } else {
+          setTimeout(() => { if (!machine) freshSession(problem); }, 1500);
+        }
       } else {
         panel.setStatus(resp?.error ?? 'Unknown error saving session', 'err');
       }
@@ -114,11 +127,11 @@
         persist();
         panel.update(machine);
       },
-      onReset: async () => { await clearStored(currentSlug); freshSession(machine.problem); },
+      onReset: async () => { await clearStored(currentSlug); freshSession(machine?.problem ?? problem); },
       onFinish: () => endSession('accepted'),
       onGiveUp: () => endSession('gave_up'),
       onSave: (values) => saveSession(values),
-      onDiscard: async () => { await clearStored(currentSlug); freshSession(machine.problem); },
+      onDiscard: async () => { await clearStored(currentSlug); freshSession(machine?.problem ?? problem); },
       onResume: () => { panel.showLiveView(); startLoops(); },
       onResumeAbandon: async () => {
         machine.end('abandoned');
