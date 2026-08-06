@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "session_id": "25403a55",
+  "problem": {
+    "difficulty": "Easy",
+    "dir_key": "3345-smallest-divisible-digit-product-i",
+    "frontend_id": "3345",
+    "slug": "smallest-divisible-digit-product-i",
+    "title": "Smallest Divisible Digit Product I",
+    "url": "https://leetcode.com/problems/smallest-divisible-digit-product-i/"
+  },
+  "language": "python3",
+  "started_at": "2026-08-06T15:59:20.422Z",
+  "ended_at": "2026-08-06T15:59:26.957Z",
+  "outcome": "accepted",
+  "phases": [
+    {
+      "phase": "thinking",
+      "start": "2026-08-06T15:59:20.422Z",
+      "end": "2026-08-06T15:59:22.751Z",
+      "source": "auto"
+    },
+    {
+      "phase": "writing",
+      "start": "2026-08-06T15:59:22.751Z",
+      "end": "2026-08-06T15:59:24.574Z",
+      "source": "manual"
+    },
+    {
+      "phase": "reviewing",
+      "start": "2026-08-06T15:59:24.574Z",
+      "end": "2026-08-06T15:59:25.025Z",
+      "source": "manual"
+    },
+    {
+      "phase": "debugging",
+      "start": "2026-08-06T15:59:25.025Z",
+      "end": "2026-08-06T15:59:26.957Z",
+      "source": "manual"
+    }
+  ],
+  "phase_totals_sec": {
+    "thinking": 0,
+    "writing": 0,
+    "reviewing": 0,
+    "debugging": 0
+  },
+  "total_active_sec": 0,
+  "run_count": 0,
+  "failed_run_count": 0,
+  "submit_count": 0,
+  "logic_idea": "",
+  "tags": [],
+  "comments": "",
+  "client": {
+    "extension_version": "0.2.0"
+  }
+}
