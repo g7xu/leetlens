@@ -25,8 +25,12 @@
   let currentTopicTags = []; // LeetCode's own topic tags for the current problem
 
   async function getKnownTags() {
-    const { knownTags = [] } = await chrome.storage.local.get('knownTags');
-    return knownTags;
+    try {
+      const { knownTags = [] } = await chrome.storage.local.get('knownTags');
+      return knownTags;
+    } catch {
+      return []; // orphaned context — suggestions just come up empty
+    }
   }
 
   /** Save-form suggestions: locally used tags, then the repo's tag vocabulary
@@ -48,14 +52,41 @@
     await chrome.storage.local.set({ knownTags: merged });
   }
 
-  function persist() {
-    if (machine && currentSlug) {
-      chrome.storage.local.set({ [storageKey(currentSlug)]: machine.snapshot() });
+  /** False once the extension is reloaded/updated: this script is then an
+   *  orphan and every chrome.* call throws "Extension context invalidated". */
+  function contextAlive() {
+    try {
+      return Boolean(chrome.runtime?.id);
+    } catch {
+      return false;
     }
   }
 
+  /** Shut down quietly instead of throwing from an orphaned script. The new
+   *  extension version only injects into pages loaded after the reload, so
+   *  tracking resumes on the next page refresh (state is in storage). */
+  function orphanTeardown() {
+    stopLoops();
+    panel?.destroy();
+    panel = null;
+    machine = null;
+    console.info('LeetLens: extension was reloaded — refresh this page to keep tracking.');
+  }
+
+  function persist() {
+    if (!machine || !currentSlug) return;
+    if (!contextAlive()) {
+      orphanTeardown();
+      return;
+    }
+    chrome.storage.local
+      .set({ [storageKey(currentSlug)]: machine.snapshot() })
+      .catch(() => {}); // context can die between the check and the call
+  }
+
   function clearStored(slug) {
-    return chrome.storage.local.remove(storageKey(slug));
+    if (!contextAlive()) return Promise.resolve();
+    return chrome.storage.local.remove(storageKey(slug)).catch(() => {});
   }
 
   function startLoops() {
@@ -81,6 +112,10 @@
 
   async function endSession(outcome) {
     if (!machine || machine.ended) return;
+    if (!contextAlive()) {
+      orphanTeardown();
+      return;
+    }
     machine.end(outcome);
     machine.language = endpoints.detectLanguage();
     persist();
@@ -205,6 +240,10 @@
   // -- MAIN-world events -------------------------------------------------
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.data?.source !== 'leetlens') return;
+    if (!contextAlive()) {
+      orphanTeardown();
+      return;
+    }
     const { type, payload } = event.data;
     if (type === 'URL_CHANGED') {
       const slug = endpoints.slugFromPath(new URL(payload.href).pathname);
