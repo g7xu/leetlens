@@ -40,7 +40,14 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add data/index.json
             git commit -m "chore: rebuild data/index.json"
-            git push
+            # The extension pushes a solution commit right after the session
+            # commit that triggered this run, so main often moves while we
+            # build. Rebase over whatever landed and retry; a racing commit
+            # with new session data retriggers the workflow anyway.
+            for attempt in 1 2 3; do
+              git push && break
+              git pull --rebase origin main || exit 1
+            done
           fi
 
       - name: Assemble Pages artifact
