@@ -1,10 +1,10 @@
 {
  "schema_version": 1,
- "generated_at": "2026-08-06T16:01:02+00:00",
+ "generated_at": "2026-08-06T23:26:09+00:00",
  "totals": {
   "problems": 11,
-  "sessions": 12,
-  "accepted": 10,
+  "sessions": 13,
+  "accepted": 11,
   "gave_up": 2,
   "abandoned": 0
  },
@@ -176,11 +176,11 @@
    "slug": "smallest-divisible-digit-product-i",
    "title": "Smallest Divisible Digit Product I",
    "difficulty": "Easy",
-   "attempts": 1,
+   "attempts": 2,
    "solved": true,
    "gave_up_count": 0,
    "first_session_at": "2026-08-06T15:59:20.422Z",
-   "last_session_at": "2026-08-06T15:59:20.422Z",
+   "last_session_at": "2026-08-06T23:02:11.028Z",
    "best_total_sec": 0,
    "tags": []
   }
@@ -472,6 +472,27 @@
    "run_count": 0,
    "failed_run_count": 0,
    "submit_count": 0,
+   "tags": []
+  },
+  {
+   "session_id": "68c6e7c9",
+   "dir_key": "3345-smallest-divisible-digit-product-i",
+   "title": "Smallest Divisible Digit Product I",
+   "difficulty": "Easy",
+   "date": "2026-08-06",
+   "started_at": "2026-08-06T23:02:11.028Z",
+   "outcome": "accepted",
+   "attempt_number": 2,
+   "total_active_sec": 504,
+   "phase_totals_sec": {
+    "thinking": 168,
+    "writing": 210,
+    "reviewing": 108,
+    "debugging": 18
+   },
+   "run_count": 2,
+   "failed_run_count": 1,
+   "submit_count": 1,
    "tags": []
   }
  ],
@@ -876,9 +897,9 @@
    "active_sec": 282
   },
   "2026-08-06": {
-   "sessions": 1,
-   "accepted": 1,
-   "active_sec": 0
+   "sessions": 2,
+   "accepted": 2,
+   "active_sec": 504
   }
  }
 }
