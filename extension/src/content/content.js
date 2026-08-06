@@ -71,6 +71,14 @@
     clearInterval(heartbeatId);
   }
 
+  /** Peel the thinking-area block off captured code: the block text becomes
+   *  the logic-idea draft, and the committed solution file stays clean. */
+  function captureCodeAndNotes(payload) {
+    const { notes, code } = endpoints.extractThinkingArea(payload.code ?? '');
+    machine.captureCode(code, payload.lang);
+    if (notes) machine.notes = notes;
+  }
+
   async function endSession(outcome) {
     if (!machine || machine.ended) return;
     machine.end(outcome);
@@ -210,12 +218,12 @@
     switch (type) {
       case 'RUN_STARTED':
         machine.runStarted();
-        machine.captureCode(payload.code, payload.lang);
+        captureCodeAndNotes(payload);
         break;
       case 'RUN_RESULT': machine.runResult(payload.passed); break;
       case 'SUBMIT_STARTED':
         machine.submitStarted();
-        machine.captureCode(payload.code, payload.lang);
+        captureCodeAndNotes(payload);
         break;
       case 'SUBMIT_RESULT':
         if (payload.accepted) { endSession('accepted'); return; }

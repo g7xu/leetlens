@@ -21,6 +21,7 @@ export class SessionMachine {
     this.pausedAt = null;
     this.typedCode = null;
     this.codeLang = null;
+    this.notes = ''; // thinking-area text extracted from the captured code
   }
 
   static randomId() {
@@ -206,6 +207,7 @@ export class SessionMachine {
       language: this.language,
       typedCode: this.typedCode,
       codeLang: this.codeLang,
+      notes: this.notes,
       pausedAt: this.pausedAt,
       heartbeat: now,
     };
@@ -227,6 +229,7 @@ export class SessionMachine {
       language: snap.language,
       typedCode: snap.typedCode ?? null,
       codeLang: snap.codeLang ?? null,
+      notes: snap.notes ?? '',
     });
     if (snap.outcome) {
       // Ended sessions restore verbatim; every segment is already closed.
