@@ -48,8 +48,8 @@ export async function fetchProblemMeta(slug) {
   };
 }
 
-const THINK_HEADER_RE = /^\s*(#|\/\/|--|;)\s*Thinking area\b/i;
-const THINK_DELIM_RE = /^[#/;-]{8,}$/;
+const THINK_HEADER_RE = /^\s*(#|\/\/|--|;|%)\s*Thinking area\b/i;
+const THINK_DELIM_RE = /^[#/;%-]{8,}$/;
 
 /**
  * Split the thinking-area comment block (injected by main-world.js) off the
@@ -72,7 +72,7 @@ export function extractThinkingArea(code) {
   if (close >= lines.length) return { notes: '', code };
   const notes = lines
     .slice(open + 1, close)
-    .map((line) => line.replace(/^\s*(#|\/\/|--|;)\s?/, ''))
+    .map((line) => line.replace(/^\s*(#|\/\/|--|;|%)\s?/, ''))
     .join('\n')
     .trim();
   let rest = close + 1;
