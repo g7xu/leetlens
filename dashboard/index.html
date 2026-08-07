@@ -33,12 +33,15 @@
 
   <section class="tiles" id="tiles"></section>
 
-  <section class="card">
-    <h2>Activity</h2>
-    <div id="calendar" class="calendar"></div>
-  </section>
-
   <div class="grid">
+    <section class="card">
+      <h2>Weak areas <span class="muted">(same score as the MCP get_weak_areas tool)</span></h2>
+      <div id="weakAreas" class="ranked-list"></div>
+    </section>
+    <section class="card">
+      <h2>Revenge list <span class="muted">(gave up, not yet beaten)</span></h2>
+      <div id="revengeList" class="ranked-list"></div>
+    </section>
     <section class="card">
       <h2>Time per phase, per session</h2>
       <div class="chart-box"><canvas id="phaseChart"></canvas></div>
@@ -56,8 +59,8 @@
       <div class="chart-box tall"><canvas id="giveUpChart"></canvas></div>
     </section>
     <section class="card">
-      <h2>Runs per session</h2>
-      <div class="chart-box"><canvas id="runChart"></canvas></div>
+      <h2>Debugging share trend <span class="muted">(weekly avg % of session time)</span></h2>
+      <div class="chart-box"><canvas id="debugChart"></canvas></div>
     </section>
     <section class="card">
       <h2>Recent sessions</h2>
@@ -74,8 +77,8 @@
   </div>
 
   <footer class="muted">
-    Data: <code>data/index.json</code> — rebuilt on every push ·
-    <a href="https://github.com/g7xu/leetlens">repo</a>
+    Powered by <a href="https://github.com/g7xu/leetlens">LeetLens</a> —
+    data rebuilt from <code>data/sessions/</code> on every push
   </footer>
 
   <script type="module" src="app.js"></script>

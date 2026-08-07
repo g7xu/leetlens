@@ -22,10 +22,28 @@
   let heartbeatId = null;
 
   const storageKey = (slug) => `session:${slug}`;
+  let currentTopicTags = []; // LeetCode's own topic tags for the current problem
 
   async function getKnownTags() {
-    const { knownTags = [] } = await chrome.storage.local.get('knownTags');
-    return knownTags;
+    try {
+      const { knownTags = [] } = await chrome.storage.local.get('knownTags');
+      return knownTags;
+    } catch {
+      return []; // orphaned context — suggestions just come up empty
+    }
+  }
+
+  /** Save-form suggestions: locally used tags, then the repo's tag vocabulary
+   *  (works on a fresh profile), then LeetCode's topic tags for this problem. */
+  async function getSuggestedTags() {
+    const local = await getKnownTags();
+    let repoTags = [];
+    try {
+      repoTags = (await chrome.runtime.sendMessage({ type: 'GET_REPO_TAGS' }))?.tags ?? [];
+    } catch {
+      /* service worker unavailable — local suggestions still work */
+    }
+    return [...new Set([...local, ...repoTags, ...currentTopicTags])];
   }
 
   async function rememberTags(tags) {
@@ -34,14 +52,41 @@
     await chrome.storage.local.set({ knownTags: merged });
   }
 
-  function persist() {
-    if (machine && currentSlug) {
-      chrome.storage.local.set({ [storageKey(currentSlug)]: machine.snapshot() });
+  /** False once the extension is reloaded/updated: this script is then an
+   *  orphan and every chrome.* call throws "Extension context invalidated". */
+  function contextAlive() {
+    try {
+      return Boolean(chrome.runtime?.id);
+    } catch {
+      return false;
     }
   }
 
+  /** Shut down quietly instead of throwing from an orphaned script. The new
+   *  extension version only injects into pages loaded after the reload, so
+   *  tracking resumes on the next page refresh (state is in storage). */
+  function orphanTeardown() {
+    stopLoops();
+    panel?.destroy();
+    panel = null;
+    machine = null;
+    console.info('LeetLens: extension was reloaded — refresh this page to keep tracking.');
+  }
+
+  function persist() {
+    if (!machine || !currentSlug) return;
+    if (!contextAlive()) {
+      orphanTeardown();
+      return;
+    }
+    chrome.storage.local
+      .set({ [storageKey(currentSlug)]: machine.snapshot() })
+      .catch(() => {}); // context can die between the check and the call
+  }
+
   function clearStored(slug) {
-    return chrome.storage.local.remove(storageKey(slug));
+    if (!contextAlive()) return Promise.resolve();
+    return chrome.storage.local.remove(storageKey(slug)).catch(() => {});
   }
 
   function startLoops() {
@@ -57,12 +102,24 @@
     clearInterval(heartbeatId);
   }
 
+  /** Peel the thinking-area block off captured code: the block text becomes
+   *  the logic-idea draft, and the committed solution file stays clean. */
+  function captureCodeAndNotes(payload) {
+    const { notes, code } = endpoints.extractThinkingArea(payload.code ?? '');
+    machine.captureCode(code, payload.lang);
+    if (notes) machine.notes = notes;
+  }
+
   async function endSession(outcome) {
     if (!machine || machine.ended) return;
+    if (!contextAlive()) {
+      orphanTeardown();
+      return;
+    }
     machine.end(outcome);
     machine.language = endpoints.detectLanguage();
     persist();
-    panel.showSaveForm(machine, await getKnownTags());
+    panel.showSaveForm(machine, await getSuggestedTags());
   }
 
   function freshSession(problem) {
@@ -76,17 +133,33 @@
     panel.setSaving(true);
     panel.setStatus('');
     const record = machine.toRecord({ ...values, extensionVersion: VERSION });
+    const code = machine.typedCode
+      ? { content: machine.typedCode, lang: machine.codeLang ?? machine.language ?? 'unknown' }
+      : null;
     try {
-      const resp = await chrome.runtime.sendMessage({ type: 'COMMIT_SESSION', record });
-      if (resp?.ok) {
+      const resp = await chrome.runtime.sendMessage({ type: 'COMMIT_SESSION', record, code });
+      if (resp?.ok || resp?.queued) {
         await rememberTags(values.tags);
         await clearStored(currentSlug);
-        panel.setStatus('Saved to GitHub ✓', 'ok');
-        setTimeout(() => freshSession(machine.problem), 1500);
-      } else if (resp?.queued) {
-        await rememberTags(values.tags);
-        await clearStored(currentSlug);
-        panel.setStatus('Offline — queued, will retry automatically', 'warn');
+        const problem = machine.problem;
+        // Null the machine so navigating away can't re-persist the already
+        // saved session as "ended but never saved".
+        machine = null;
+        panel.setStatus(
+          resp.ok ? 'Saved to GitHub ✓' : 'Offline — queued, will retry automatically',
+          resp.ok ? 'ok' : 'warn',
+        );
+        // The user usually wants to go back to where they came from (problem
+        // list, study plan). Offer it instead of navigating automatically.
+        if (window.history.length > 1) {
+          panel.showSavedActions({
+            canGoBack: true,
+            onBack: () => window.history.back(),
+            onNewSession: () => freshSession(problem),
+          });
+        } else {
+          setTimeout(() => { if (!machine) freshSession(problem); }, 1500);
+        }
       } else {
         panel.setStatus(resp?.error ?? 'Unknown error saving session', 'err');
       }
@@ -101,7 +174,9 @@
     currentSlug = slug;
     let problem;
     try {
-      problem = await endpoints.fetchProblemMeta(slug);
+      const meta = await endpoints.fetchProblemMeta(slug);
+      problem = meta.problem;
+      currentTopicTags = meta.topic_tags;
     } catch {
       return; // not a solvable problem page (or GraphQL changed) — stay out of the way
     }
@@ -114,16 +189,16 @@
         persist();
         panel.update(machine);
       },
-      onReset: async () => { await clearStored(currentSlug); freshSession(machine.problem); },
+      onReset: async () => { await clearStored(currentSlug); freshSession(machine?.problem ?? problem); },
       onFinish: () => endSession('accepted'),
       onGiveUp: () => endSession('gave_up'),
       onSave: (values) => saveSession(values),
-      onDiscard: async () => { await clearStored(currentSlug); freshSession(machine.problem); },
+      onDiscard: async () => { await clearStored(currentSlug); freshSession(machine?.problem ?? problem); },
       onResume: () => { panel.showLiveView(); startLoops(); },
       onResumeAbandon: async () => {
         machine.end('abandoned');
         machine.language = endpoints.detectLanguage();
-        panel.showSaveForm(machine, await getKnownTags());
+        panel.showSaveForm(machine, await getSuggestedTags());
       },
       onResumeDiscard: async () => { await clearStored(currentSlug); freshSession(problem); },
     });
@@ -144,7 +219,7 @@
       machine = SessionMachine.fromSnapshot(stored);
       machine.outcome = stored.outcome;
       machine.endedAt = stored.endedAt ?? stored.heartbeat;
-      panel.showSaveForm(machine, await getKnownTags());
+      panel.showSaveForm(machine, await getSuggestedTags());
     } else {
       machine = new SessionMachine(problem);
       persist();
@@ -165,6 +240,10 @@
   // -- MAIN-world events -------------------------------------------------
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.data?.source !== 'leetlens') return;
+    if (!contextAlive()) {
+      orphanTeardown();
+      return;
+    }
     const { type, payload } = event.data;
     if (type === 'URL_CHANGED') {
       const slug = endpoints.slugFromPath(new URL(payload.href).pathname);
@@ -176,9 +255,15 @@
     }
     if (!machine || machine.ended) return;
     switch (type) {
-      case 'RUN_STARTED': machine.runStarted(); break;
+      case 'RUN_STARTED':
+        machine.runStarted();
+        captureCodeAndNotes(payload);
+        break;
       case 'RUN_RESULT': machine.runResult(payload.passed); break;
-      case 'SUBMIT_STARTED': machine.submitStarted(); break;
+      case 'SUBMIT_STARTED':
+        machine.submitStarted();
+        captureCodeAndNotes(payload);
+        break;
       case 'SUBMIT_RESULT':
         if (payload.accepted) { endSession('accepted'); return; }
         machine.submitResult(false);

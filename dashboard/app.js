@@ -1,5 +1,5 @@
 // LeetLens dashboard: loads data/index.json, applies filters, renders tiles,
-// calendar, charts (charts.js) and the sessions table.
+// weak areas, the revenge list, charts (charts.js) and the sessions table.
 
 import { buildCharts, destroyCharts } from './charts.js';
 
@@ -67,18 +67,6 @@ function median(values) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-function streakDays(sessions) {
-  const days = new Set(sessions.map((s) => s.date));
-  if (!days.size) return 0;
-  let day = new Date([...days].sort().at(-1));
-  let streak = 0;
-  while (days.has(day.toISOString().slice(0, 10))) {
-    streak += 1;
-    day.setDate(day.getDate() - 1);
-  }
-  return streak;
-}
-
 function renderTiles(rows) {
   const solved = new Set(rows.filter((s) => s.outcome === 'accepted').map((s) => s.dir_key)).size;
   const gaveUp = rows.filter((s) => s.outcome === 'gave_up').length;
@@ -89,7 +77,6 @@ function renderTiles(rows) {
     { label: 'sessions', value: rows.length },
     { label: 'give-up rate', value: `${rate}%`, cls: rate > 25 ? 'bad' : '' },
     { label: 'median solve time', value: fmtMin(med) },
-    { label: 'day streak', value: streakDays(rows), cls: 'good' },
   ];
   $('tiles').replaceChildren(...tiles.map(({ label, value, cls }) => {
     const tile = document.createElement('div');
@@ -105,41 +92,144 @@ function renderTiles(rows) {
   }));
 }
 
-// -- calendar ----------------------------------------------------------
+// -- weak areas --------------------------------------------------------
+// Same formula as the MCP server's get_weak_areas tool (mcp/…/stats.py), so
+// the dashboard and Claude tell the same story:
+//   score = 0.4*give_up_rate + 0.3*slowness + 0.2*debugging share + 0.1*run factor
 
-function renderCalendar(rows, t) {
-  const byDay = {};
-  for (const s of rows) byDay[s.date] = (byDay[s.date] ?? 0) + s.total_active_sec;
-  const weeks = 26;
-  const today = new Date();
-  const start = new Date(today);
-  start.setDate(start.getDate() - (weeks * 7 - 1) - today.getDay());
-  const container = $('calendar');
-  container.replaceChildren();
-  const max = Math.max(...Object.values(byDay), 1);
-  const day = new Date(start);
-  for (let w = 0; w < weeks; w++) {
-    const col = document.createElement('div');
-    col.className = 'cal-week';
-    for (let d = 0; d < 7; d++) {
-      const key = day.toISOString().slice(0, 10);
-      const cell = document.createElement('div');
-      cell.className = 'cal-day';
-      const sec = byDay[key];
-      if (sec) {
-        const step = Math.min(4, Math.floor((sec / max) * 4) + 1);
-        cell.style.background = t.seq[step];
-        cell.style.borderColor = 'transparent';
-        cell.title = `${key}: ${fmtMin(sec)} active`;
-      } else {
-        cell.title = key;
-      }
-      col.append(cell);
-      day.setDate(day.getDate() + 1);
-    }
-    container.append(col);
+function weakAreas(rows, minSessions = 2, topN = 5) {
+  if (!rows.length) return [];
+  const globalMedian = median(rows.map((s) => s.total_active_sec)) || 1;
+  const globalRuns = rows.reduce((sum, s) => sum + s.run_count, 0) / rows.length || 1;
+  const byTag = {};
+  for (const s of rows) for (const tag of s.tags) (byTag[tag] ??= []).push(s);
+  return Object.entries(byTag)
+    .filter(([, list]) => list.length >= minSessions)
+    .map(([tag, list]) => {
+      const avg = (fn) => list.reduce((sum, s) => sum + fn(s), 0) / list.length;
+      const avgTotal = avg((s) => s.total_active_sec);
+      const giveUpRate = list.filter((s) => s.outcome === 'gave_up').length / list.length;
+      const debugShare = avg((s) => s.phase_totals_sec.debugging) / Math.max(avgTotal, 1);
+      const avgRuns = avg((s) => s.run_count);
+      const score =
+        0.4 * giveUpRate +
+        0.3 * (Math.min(avgTotal / globalMedian, 2) / 2) +
+        0.2 * debugShare +
+        0.1 * (Math.min(avgRuns / globalRuns, 2) / 2);
+      return {
+        tag,
+        score,
+        giveUpRate,
+        slowness: avgTotal / globalMedian,
+        debugShare,
+        avgRuns,
+        sessions: list.length,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topN);
+}
+
+function renderWeakAreas(rows) {
+  const container = $('weakAreas');
+  const areas = weakAreas(rows);
+  if (!areas.length) {
+    const p = document.createElement('p');
+    p.className = 'muted';
+    p.textContent = 'Not enough tagged sessions yet (needs 2+ sessions per tag).';
+    container.replaceChildren(p);
+    return;
   }
-  container.scrollLeft = container.scrollWidth;
+  const maxScore = areas[0].score || 1;
+  container.replaceChildren(...areas.map((a) => {
+    const row = document.createElement('div');
+    row.className = 'ranked-row';
+    const top = document.createElement('div');
+    top.className = 'ranked-top';
+    const name = document.createElement('span');
+    name.className = 'tag-pill';
+    name.textContent = a.tag;
+    const score = document.createElement('span');
+    score.className = 'ranked-score';
+    score.textContent = a.score.toFixed(2);
+    top.append(name, score);
+    const bar = document.createElement('div');
+    bar.className = 'score-bar';
+    const fill = document.createElement('div');
+    fill.style.width = `${(a.score / maxScore) * 100}%`;
+    bar.append(fill);
+    const detail = document.createElement('div');
+    detail.className = 'ranked-detail';
+    detail.textContent =
+      `${Math.round(a.giveUpRate * 100)}% give-ups · ` +
+      `${a.slowness.toFixed(1)}× median time · ` +
+      `${Math.round(a.debugShare * 100)}% debugging · ` +
+      `${a.avgRuns.toFixed(1)} runs · ${a.sessions} sessions`;
+    row.append(top, bar, detail);
+    return row;
+  }));
+}
+
+// -- revenge list --------------------------------------------------------
+// Problems with a gave_up session and no accepted session after it.
+
+let slugByDirKey = {};
+
+function revengeList(rows) {
+  const byProblem = {};
+  for (const s of rows) (byProblem[s.dir_key] ??= []).push(s);
+  const out = [];
+  for (const list of Object.values(byProblem)) {
+    const sorted = [...list].sort((a, b) => a.started_at.localeCompare(b.started_at));
+    const lastAccepted = sorted.findLast((s) => s.outcome === 'accepted');
+    const lastGaveUp = sorted.findLast((s) => s.outcome === 'gave_up');
+    if (lastGaveUp && (!lastAccepted || lastAccepted.started_at < lastGaveUp.started_at)) {
+      out.push({
+        dir_key: sorted[0].dir_key,
+        title: sorted[0].title,
+        difficulty: sorted[0].difficulty,
+        attempts: sorted.length,
+        lastTried: sorted.at(-1).date,
+      });
+    }
+  }
+  return out.sort((a, b) => b.lastTried.localeCompare(a.lastTried));
+}
+
+function renderRevengeList(rows) {
+  const container = $('revengeList');
+  const items = revengeList(rows);
+  if (!items.length) {
+    const p = document.createElement('p');
+    p.className = 'muted';
+    p.textContent = 'Nothing to avenge — every give-up has been beaten.';
+    container.replaceChildren(p);
+    return;
+  }
+  container.replaceChildren(...items.map((item) => {
+    const row = document.createElement('div');
+    row.className = 'ranked-row';
+    const top = document.createElement('div');
+    top.className = 'ranked-top';
+    const slug = slugByDirKey[item.dir_key];
+    const name = slug ? document.createElement('a') : document.createElement('span');
+    if (slug) {
+      name.href = `https://leetcode.com/problems/${slug}/`;
+      name.target = '_blank';
+      name.rel = 'noopener';
+    }
+    name.textContent = item.title;
+    const diff = document.createElement('span');
+    diff.className = 'ranked-score';
+    diff.textContent = item.difficulty;
+    top.append(name, diff);
+    const detail = document.createElement('div');
+    detail.className = 'ranked-detail';
+    detail.textContent =
+      `${item.attempts} attempt${item.attempts === 1 ? '' : 's'} · last tried ${item.lastTried}`;
+    row.append(top, detail);
+    return row;
+  }));
 }
 
 // -- sessions table ------------------------------------------------------
@@ -182,7 +272,8 @@ function render() {
   const rows = applyFilters(index.sessions);
   const t = theme();
   renderTiles(rows);
-  renderCalendar(rows, t);
+  renderWeakAreas(rows);
+  renderRevengeList(rows);
   renderTable(rows);
   destroyCharts();
   buildCharts(rows, t);
@@ -199,6 +290,7 @@ function render() {
     return;
   }
   $('generatedAt').textContent = `updated ${index.generated_at.slice(0, 10)}`;
+  slugByDirKey = Object.fromEntries(index.problems.map((p) => [p.dir_key, p.slug]));
   const tags = Object.keys(index.tags).sort();
   $('tagFilter').append(...tags.map((tag) => new Option(tag, tag)));
   for (const id of ['rangeFilter', 'difficultyFilter', 'tagFilter']) {

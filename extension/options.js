@@ -31,8 +31,38 @@ $('test').addEventListener('click', async () => {
     type: 'TEST_CONNECTION',
     settings: formSettings(),
   });
-  if (resp?.ok) status(`Connected to ${resp.repo} with push access ✓`, 'ok');
-  else status(resp?.error ?? 'Connection failed', 'err');
+  // Only the push permission is verifiable here: the one "Set up repo" also
+  // needs can't be tested without actually writing a workflow file, so name it
+  // rather than let a green check imply setup will succeed.
+  if (resp?.ok) {
+    status(`Connected to ${resp.repo} — sessions can be saved ✓. "Set up repo" ` +
+      'also needs Workflows: Read and write, which this test cannot check.', 'ok');
+  } else status(resp?.error ?? 'Connection failed', 'err');
+});
+
+$('setup').addEventListener('click', async () => {
+  await saveSettings(formSettings()); // set up what's on screen, not stale storage
+  status('Setting up repo…');
+  const resp = await chrome.runtime.sendMessage({ type: 'SETUP_REPO' });
+  if (!resp?.ok) {
+    status(resp?.error ?? 'Setup failed', 'err');
+    return;
+  }
+  if (resp.pagesEnabled) {
+    status('Repo is ready — workflow committed, GitHub Pages enabled ✓', 'ok');
+  } else {
+    const { owner, repo } = formSettings();
+    $('status').className = 'ok';
+    $('status').replaceChildren(
+      'Workflow committed ✓ — final step: enable Pages at ',
+      Object.assign(document.createElement('a'), {
+        href: `https://github.com/${owner}/${repo}/settings/pages`,
+        target: '_blank',
+        textContent: 'Settings → Pages',
+      }),
+      ' → Source: GitHub Actions.',
+    );
+  }
 });
 
 $('flush').addEventListener('click', async () => {

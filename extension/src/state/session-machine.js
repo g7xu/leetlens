@@ -19,6 +19,9 @@ export class SessionMachine {
     this.failedRunCount = 0;
     this.submitCount = 0;
     this.pausedAt = null;
+    this.typedCode = null;
+    this.codeLang = null;
+    this.notes = ''; // thinking-area text extracted from the captured code
   }
 
   static randomId() {
@@ -90,6 +93,13 @@ export class SessionMachine {
     } else if (this.currentPhase === 'debugging') {
       this.setPhase('reviewing', 'auto', now);
     }
+  }
+
+  /** Latest editor contents, captured from a run/submit request body. */
+  captureCode(code, lang) {
+    if (typeof code !== 'string' || !code.trim()) return;
+    this.typedCode = code;
+    if (lang) this.codeLang = lang;
   }
 
   submitStarted(now = Date.now()) {
@@ -195,6 +205,9 @@ export class SessionMachine {
       failedRunCount: this.failedRunCount,
       submitCount: this.submitCount,
       language: this.language,
+      typedCode: this.typedCode,
+      codeLang: this.codeLang,
+      notes: this.notes,
       pausedAt: this.pausedAt,
       heartbeat: now,
     };
@@ -214,6 +227,9 @@ export class SessionMachine {
       failedRunCount: snap.failedRunCount,
       submitCount: snap.submitCount,
       language: snap.language,
+      typedCode: snap.typedCode ?? null,
+      codeLang: snap.codeLang ?? null,
+      notes: snap.notes ?? '',
     });
     if (snap.outcome) {
       // Ended sessions restore verbatim; every segment is already closed.

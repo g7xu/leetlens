@@ -90,12 +90,17 @@ code { background: var(--surface-1); border: 1px solid var(--border);
 .chart-box { position: relative; height: 260px; }
 .chart-box.tall { height: 320px; }
 
-.calendar { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
-.cal-week { display: flex; flex-direction: column; gap: 3px; }
-.cal-day {
-  width: 13px; height: 13px; border-radius: 3px;
-  background: var(--page); border: 1px solid var(--grid);
+.ranked-list { display: flex; flex-direction: column; gap: 12px; }
+.ranked-row { display: flex; flex-direction: column; gap: 4px; }
+.ranked-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ranked-top a { font-weight: 600; text-decoration: none; }
+.ranked-top a:hover { text-decoration: underline; }
+.ranked-score { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ranked-detail { color: var(--muted); font-size: 12px; }
+.score-bar {
+  height: 6px; border-radius: 999px; background: var(--grid); overflow: hidden;
 }
+.score-bar div { height: 100%; border-radius: 999px; background: var(--accent); }
 
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }

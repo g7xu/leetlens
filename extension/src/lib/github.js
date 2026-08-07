@@ -24,23 +24,49 @@ function b64encode(text) {
   return btoa(binary);
 }
 
-/** Create a new file. Paths are always new (timestamp+id), so no SHA dance. */
-export async function putFile(path, content, message) {
+/**
+ * Create or update a file. Session paths are always new (timestamp+id) so they
+ * need no SHA; pass overwrite for stable paths (solution code on re-attempts),
+ * where the Contents API requires the existing file's SHA.
+ */
+export async function putFile(path, content, message, { overwrite = false } = {}) {
   const { token, owner, repo, branch } = await getSettings();
   if (!token || !owner || !repo) {
     throw new Error('LeetLens is not configured — open the extension options first.');
   }
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+  const body = { message, branch, content: b64encode(content) };
+  if (overwrite) {
+    const existing = await fetch(`${url}?ref=${encodeURIComponent(branch)}`, {
+      headers: headers(token),
+    });
+    if (existing.ok) body.sha = (await existing.json()).sha;
+  }
   const resp = await fetch(url, {
     method: 'PUT',
     headers: headers(token),
-    body: JSON.stringify({ message, branch, content: b64encode(content) }),
+    body: JSON.stringify(body),
   });
   if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(`GitHub ${resp.status}: ${body.slice(0, 200)}`);
+    const respBody = await resp.text();
+    throw new Error(`GitHub ${resp.status}: ${respBody.slice(0, 200)}`);
   }
   return resp.json();
+}
+
+/**
+ * Fetch a repo file's raw contents via the Contents API (works for private
+ * repos, unlike raw.githubusercontent.com). Returns null when unconfigured
+ * or the file doesn't exist.
+ */
+export async function getFileRaw(path) {
+  const { token, owner, repo, branch } = await getSettings();
+  if (!token || !owner || !repo) return null;
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}`;
+  const resp = await fetch(url, {
+    headers: { ...headers(token), Accept: 'application/vnd.github.raw+json' },
+  });
+  return resp.ok ? resp.text() : null;
 }
 
 /** Used by the options page "Test connection" button. */
