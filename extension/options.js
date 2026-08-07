@@ -31,8 +31,13 @@ $('test').addEventListener('click', async () => {
     type: 'TEST_CONNECTION',
     settings: formSettings(),
   });
-  if (resp?.ok) status(`Connected to ${resp.repo} with push access ✓`, 'ok');
-  else status(resp?.error ?? 'Connection failed', 'err');
+  // Only the push permission is verifiable here: the one "Set up repo" also
+  // needs can't be tested without actually writing a workflow file, so name it
+  // rather than let a green check imply setup will succeed.
+  if (resp?.ok) {
+    status(`Connected to ${resp.repo} — sessions can be saved ✓. "Set up repo" ` +
+      'also needs Workflows: Read and write, which this test cannot check.', 'ok');
+  } else status(resp?.error ?? 'Connection failed', 'err');
 });
 
 $('setup').addEventListener('click', async () => {

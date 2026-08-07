@@ -125,7 +125,18 @@ async function enablePages() {
  */
 export async function setupRepo() {
   await putFile(WORKFLOW_PATH, WORKFLOW_YML,
-    'leetlens: add dashboard publish workflow', { overwrite: true });
+    'leetlens: add dashboard publish workflow', { overwrite: true })
+    .catch((err) => {
+      // Writing under .github/workflows/ needs the token's separate "Workflows"
+      // permission, and GitHub refuses without it as a 404 — indistinguishable
+      // from a missing repo unless we say what it actually means.
+      if (String(err).includes('404')) {
+        throw new Error(
+          'GitHub refused to write .github/workflows/publish.yml — add ' +
+          '"Workflows: Read and write" to your token\'s repository permissions.');
+      }
+      throw err;
+    });
   await putFile('data/sessions/.gitkeep', '',
     'leetlens: create sessions folder', { overwrite: true });
   await putFile('.gitignore', GITIGNORE,
