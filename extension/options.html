@@ -38,8 +38,8 @@
   <p>Sessions are committed to <code>data/sessions/</code> in the repo below.</p>
 
   <div class="row">
-    <div><label for="owner">GitHub owner</label><input id="owner" placeholder="g7xu"></div>
-    <div><label for="repo">Repository</label><input id="repo" placeholder="leetlens"></div>
+    <div><label for="owner">GitHub owner</label><input id="owner" placeholder="your-github-username"></div>
+    <div><label for="repo">Repository</label><input id="repo" placeholder="leetcode-journal"></div>
     <div><label for="branch">Branch</label><input id="branch" placeholder="main"></div>
   </div>
   <label for="token">Fine-grained personal access token</label>
@@ -47,6 +47,7 @@
 
   <button id="save">Save</button>
   <button id="test" class="secondary">Test connection</button>
+  <button id="setup" class="secondary">Set up repo for LeetLens</button>
   <button id="flush" class="secondary">Retry queued commits (<span id="queueCount">0</span>)</button>
   <div id="status"></div>
 
@@ -57,6 +58,14 @@
     Permissions: <b>Contents — Read and write</b>. Nothing else. The token is stored
     in this browser profile's extension storage; anyone with access to this machine
     profile could read it, which is why it should be scoped to this one repo.
+  </div>
+
+  <div class="help">
+    <b>Set up repo</b> turns the repo above into a LeetLens data repo: it commits
+    the dashboard workflow and the sessions folder. Works on an empty repo or an
+    existing one (e.g. your LeetHub repo). If the button can't enable GitHub Pages
+    for you (that needs the optional <b>Pages — Read and write</b> token permission),
+    finish with one manual step: repo <i>Settings → Pages → Source: GitHub Actions</i>.
   </div>
 
   <script src="options.js" type="module"></script>
