@@ -56,31 +56,38 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
 
-      - name: Rebuild data/index.json
+      - name: Rebuild and commit data/index.json
         # The indexer reads and writes at the given root (this data repo)
         # while the code runs from the .leetlens checkout. Absolute path is
         # required: 'uv run --directory' changes cwd.
-        run: uv run --directory .leetlens/mcp python -m leetlens_mcp.indexer "$GITHUB_WORKSPACE"
-
-      - name: Commit index if changed
         run: |
-          git add data/index.json
-          # --cached: works on the very first run, when index.json is untracked
-          # (plain 'git diff' ignores untracked files and would skip the commit).
-          # -I ignores timestamp-only diffs so no-op runs don't create commits.
-          if ! git diff --cached -I'"generated_at"' --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "chore: rebuild data/index.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            uv run --directory .leetlens/mcp python -m leetlens_mcp.indexer "$GITHUB_WORKSPACE"
+            git add data/index.json
+            # --cached: works on the very first run, when index.json is
+            # untracked (plain 'git diff' ignores untracked files and would
+            # skip the commit). -I ignores timestamp-only diffs, so a run that
+            # changes nothing — including one racing a run that already
+            # published the same index — creates no commit.
+            if git diff --cached -I'"generated_at"' --quiet; then
+              echo "index already up to date"
+              exit 0
+            fi
+            git commit -q -m "chore: rebuild data/index.json"
+            git push && exit 0
             # The extension pushes a solution commit right after the session
             # commit that triggered this run, so main often moves while we
-            # build. Rebase over whatever landed and retry; a racing commit
-            # with new session data retriggers the workflow anyway.
-            for attempt in 1 2 3; do
-              git push && break
-              git pull --rebase origin main || exit 1
-            done
-          fi
+            # build. index.json is generated, never authored, so there is
+            # nothing to merge: rebasing our copy onto theirs only conflicts
+            # with itself. Take what landed and rebuild from it instead.
+            echo "main moved while building — rebuilding on top of it"
+            git fetch -q origin main
+            git reset -q --hard origin/main
+          done
+          echo "::error::could not publish the rebuilt index after 3 attempts"
+          exit 1
 
       - name: Assemble Pages artifact
         # Only dashboard source + the index — .leetlens is never deployed.
