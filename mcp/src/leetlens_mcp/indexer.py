@@ -15,7 +15,7 @@ from .store import DataStore, repo_root
 
 
 def build_index(root: Path) -> dict:
-    store = DataStore()
+    store = DataStore(root)
     records = store.load_sessions()
     return {
         "schema_version": 1,
@@ -38,6 +38,7 @@ def main() -> None:
     root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else repo_root()
     index = build_index(root)
     out = root / "data" / "index.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(index, indent=1) + "\n")
     print(
         f"wrote {out} — {index['totals']['sessions']} sessions, "

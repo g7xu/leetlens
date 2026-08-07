@@ -2,6 +2,7 @@
 // GitHub. Failed commits are queued in storage and retried on startup.
 
 import { getFileRaw, putFile, testConnection } from '../lib/github.js';
+import { setupRepo } from '../lib/repo-setup.js';
 
 // Tag vocabulary from the repo's data/index.json, so suggestions work on a
 // fresh browser profile. Cached with a TTL to avoid an API call per problem page.
@@ -122,6 +123,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       case 'TEST_CONNECTION':
         sendResponse(await testConnection(message.settings));
+        break;
+      case 'SETUP_REPO':
+        try {
+          sendResponse({ ok: true, ...(await setupRepo()) });
+        } catch (err) {
+          sendResponse({ ok: false, error: String(err) });
+        }
         break;
       case 'FLUSH_QUEUE':
         sendResponse(await flushQueue());

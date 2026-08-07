@@ -26,10 +26,15 @@ def repo_root() -> Path:
 
 
 class DataStore:
-    def __init__(self) -> None:
+    def __init__(self, root: Path | str | None = None) -> None:
         self.mode = os.environ.get("LCP_SOURCE", "local")
-        self.repo = os.environ.get("LCP_GITHUB_REPO", "g7xu/leetlens")
+        self.root = Path(root).expanduser().resolve() if root else repo_root()
+        self.repo = os.environ.get("LCP_GITHUB_REPO")
         self.branch = os.environ.get("LCP_GITHUB_BRANCH", "main")
+        if self.mode == "github" and not self.repo:
+            raise RuntimeError(
+                "LCP_SOURCE=github requires LCP_GITHUB_REPO=<owner>/<data-repo>"
+            )
         self._cache: dict[str, tuple[float, object]] = {}
 
     # -- caching -------------------------------------------------------
@@ -54,7 +59,7 @@ class DataStore:
                 if text is not None:
                     return text
             return None
-        folder = repo_root() / dir_key
+        folder = self.root / dir_key
         if folder.is_dir():
             for f in sorted(folder.iterdir()):
                 if f.suffix in {".py", ".java", ".cpp", ".js", ".ts", ".go"}:
@@ -66,9 +71,15 @@ class DataStore:
         if self.mode == "github":
             records = self._load_sessions_github()
         else:
+            sessions_dir = self.root / "data" / "sessions"
+            if not sessions_dir.is_dir():
+                raise RuntimeError(
+                    f"no data/sessions under {self.root} — point LCP_REPO_PATH at "
+                    "a clone of your LeetLens data repo (see the leetlens README)"
+                )
             records = [
                 json.loads(f.read_text())
-                for f in sorted((repo_root() / "data" / "sessions").glob("*/*.json"))
+                for f in sorted(sessions_dir.glob("*/*.json"))
             ]
         records.sort(key=lambda r: r["started_at"])
         by_problem: dict[str, int] = {}
