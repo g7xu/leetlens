@@ -34,6 +34,7 @@ Create a [fine-grained token](https://github.com/settings/personal-access-tokens
 
 - **Repository access**: choose **Only select repositories** and pick *your data repo*. If the repo is *private*, the default "Public repositories" option silently excludes it.
 - **Repository permissions**: in the *Select repository permissions* search box type **contents** (search by permission *name* — typing "read" finds nothing), click **Contents**, then set its *Access* dropdown to **Read and write**. "Metadata: Read-only" is added automatically — leave it.
+- **Workflows — Read and write.** Setup commits `.github/workflows/publish.yml`, and GitHub gates workflow files behind this separate permission. Without it the setup button fails with a **404** that looks like a missing repo.
 - Optional: also grant **Pages — Read and write** so the setup button can enable your dashboard automatically.
 - Everything else stays at "No access". When the token expires, commits start failing with 401 — regenerate and re-paste.
 
@@ -41,8 +42,8 @@ Create a [fine-grained token](https://github.com/settings/personal-access-tokens
 
 Open the extension's Options page, fill owner / repo / branch, paste the token:
 
-1. **Test connection** → you want the green *"push access ✓"*. "repo lookup failed (404)" means the repo isn't granted to the token; "token cannot push" means Contents is still read-only.
-2. **Set up repo for LeetLens** → commits the dashboard workflow and sessions folder into your repo. If the button couldn't enable GitHub Pages itself, do the one manual step it links: repo *Settings → Pages → Source: **GitHub Actions***.
+1. **Test connection** → you want the green *"sessions can be saved ✓"*. "repo lookup failed (404)" means the repo isn't granted to the token; "token cannot push" means Contents is still read-only. This step can't verify the Workflows permission — only step 2 exercises it.
+2. **Set up repo for LeetLens** → commits the dashboard workflow and sessions folder into your repo. A 404 here means the token is missing **Workflows: Read and write** (GitHub reports that as "not found", not "forbidden"). If the button couldn't enable GitHub Pages itself, do the one manual step it links: repo *Settings → Pages → Source: **GitHub Actions***.
 
 That's it. Open any LeetCode problem — the LeetLens panel appears, a *thinking area* comment block is added to the editor for sketching your approach, and **Finish → Save to GitHub** commits the session + your code. Your dashboard lives at `https://<owner>.github.io/<repo>/` and rebuilds on every push.
 
