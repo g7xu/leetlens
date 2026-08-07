@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from typing import Literal
 
 from mcp.server.mcpserver import MCPServer
@@ -22,8 +23,9 @@ def list_sessions(
     date_from: str | None = None,
     date_to: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[dict]:
-    """List solving sessions (newest first), filterable by tag, difficulty, outcome, and date (YYYY-MM-DD)."""
+    """List solving sessions (newest first), filterable by tag, difficulty, outcome, and date (YYYY-MM-DD). Page with limit/offset."""
     rows = [stats.session_summary(r) for r in store.load_sessions()]
     if tag:
         rows = [r for r in rows if tag in r["tags"]]
@@ -35,7 +37,8 @@ def list_sessions(
         rows = [r for r in rows if r["date"] >= date_from]
     if date_to:
         rows = [r for r in rows if r["date"] <= date_to]
-    return sorted(rows, key=lambda r: r["started_at"], reverse=True)[:limit]
+    rows.sort(key=lambda r: r["started_at"], reverse=True)
+    return rows[offset : offset + limit]
 
 
 @mcp.tool()
@@ -93,6 +96,67 @@ def list_tags(prefix: str | None = None) -> list[dict]:
     if prefix:
         rows = [r for r in rows if r["tag"].startswith(prefix)]
     return rows
+
+
+@mcp.tool()
+def get_revenge_list() -> list[dict]:
+    """Problems you gave up on with no accepted session since — the literal to-do list of unfinished fights, newest first."""
+    return stats.revenge_list(store.load_sessions())
+
+
+@mcp.tool()
+def get_stale_tags(days: int = 30) -> list[dict]:
+    """Tags not practiced in `days` days (spaced-repetition nudge), most stale first."""
+    return stats.stale_tags(store.load_sessions(), days)
+
+
+@mcp.tool()
+def recommend_next(count: int = 3) -> list[dict]:
+    """Concrete "solve these next" suggestions with reasons, combining revenge problems, weak areas, and stale tags."""
+    return stats.recommend_next(store.load_sessions(), count)
+
+
+@mcp.tool()
+def search_notes(query: str, limit: int = 20) -> list[dict]:
+    """Full-text (case-insensitive substring) search over logic_idea and comments; returns matching sessions newest first with the matched text."""
+    return stats.search_notes(store.load_sessions(), query, limit)
+
+
+@mcp.tool()
+def compare_periods(period_a: str = "this_month", period_b: str = "last_month") -> dict:
+    """Compare two periods (this_month, last_month, last_30d, prev_30d, or YYYY-MM): solve time, give-up rate, debugging share, run counts, plus deltas."""
+    try:
+        return stats.compare_periods(store.load_sessions(), period_a, period_b)
+    except ValueError as err:
+        return {"error": str(err)}
+
+
+@mcp.prompt()
+def weekly_review() -> str:
+    """Weekly practice review: last 7 days, weak areas, and a plan for next week."""
+    return (
+        "Review my LeetCode practice using the LeetLens tools:\n"
+        "1. Call list_sessions for the last 7 days and summarize what I worked on "
+        "(problems, outcomes, time spent, phase balance).\n"
+        "2. Call get_weak_areas and explain the top weaknesses using the score components, "
+        "and get_trends(metric='debugging_share') to say whether I'm getting cleaner.\n"
+        "3. Call get_revenge_list and get_stale_tags to find unfinished fights and rusty topics.\n"
+        "4. End with a concrete plan for next week: 3-5 specific problems or tags "
+        "(use recommend_next), each with a one-line reason."
+    )
+
+
+@mcp.resource("leetlens://index", mime_type="application/json")
+def index_resource() -> str:
+    """The aggregate index (totals, per-problem summaries, sessions, tags, daily activity)."""
+    return store.load_index_raw()
+
+
+@mcp.resource("leetlens://sessions/{dir_key}", mime_type="application/json")
+def sessions_resource(dir_key: str) -> str:
+    """Full session records for one problem, e.g. leetlens://sessions/0001-two-sum."""
+    records = [r for r in store.load_sessions() if r["problem"]["dir_key"] == dir_key]
+    return json.dumps(records, indent=1)
 
 
 def main() -> None:

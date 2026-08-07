@@ -79,7 +79,7 @@ LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> \
   uv run --directory mcp leetlens-mcp --transport streamable-http --port 8765
 ```
 
-and add it as a connector in ChatGPT → Settings → Connectors (developer mode), e.g. through an `ngrok http 8765` tunnel. Private data repo? Also set `LCP_GITHUB_TOKEN` (the same fine-grained PAT works — Contents: read is enough).
+and add it as a connector in ChatGPT → Settings → Connectors (developer mode), e.g. through an `ngrok http 8765` tunnel. Private data repo? Also set `LCP_GITHUB_TOKEN` (the same fine-grained PAT works — Contents: read is enough), which switches fetching from raw.githubusercontent.com to the authenticated Contents API.
 
 ## Data model
 
