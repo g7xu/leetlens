@@ -2,6 +2,7 @@
 name = "leetlens-mcp"
 version = "0.1.0"
 description = "MCP server exposing LeetLens practice-session data for LLM analysis"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = ["mcp[cli]>=1.2.0", "httpx>=0.27"]
 

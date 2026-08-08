@@ -93,6 +93,7 @@ export const PANEL_CSS = `
 }
 .chip:hover { background: #3a4a6b; }
 
+.code-note { margin-top: 8px; font-size: 11px; color: #8b93a1; }
 .status { margin-top: 8px; font-size: 12px; min-height: 16px; }
 .status.ok { color: #8fd9a8; }
 .status.err { color: #f2a0a8; }

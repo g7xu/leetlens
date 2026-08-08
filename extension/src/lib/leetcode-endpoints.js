@@ -48,8 +48,28 @@ export async function fetchProblemMeta(slug) {
   };
 }
 
-const THINK_HEADER_RE = /^\s*(#|\/\/|--|;|%)\s*Thinking area\b/i;
+// Openers main-world.js writes, plus the line-comment tokens older blocks used.
+// `#|` must precede `#`, since the captured opener is what selects the parsing
+// branch below and the alternation is ordered.
+//
+// The trailing `[ \t]` (not `\s`) matters twice over: `\s` would match a
+// newline and let the pattern run past the header line, and requiring a space
+// or tab after `/*` is what stops LeetCode's own `/** Definition for ListNode
+// … */` template docblock from being read as a thinking area and stripped out
+// of the committed solution. Never loosen this to `\/\*+`.
+//
+// main-world.js carries its own copy of this pattern (it is a MAIN-world
+// script and cannot import). Keep the two in sync; test/thinking-area.test.mjs
+// pins the shapes both sides must agree on.
+const THINK_HEADER_RE = /^[ \t]*(r?"""|'''|\/\*|=begin|#\||#|\/\/|--|;|%)[ \t]*Thinking area\b/i;
 const THINK_DELIM_RE = /^[#/;%-]{8,}$/;
+
+// Block openers -> what terminates them. An opener absent here is a legacy
+// line-comment header, whose region is fenced by THINK_DELIM_RE rulers.
+const BLOCK_CLOSER = {
+  'r"""': '"""', '"""': '"""', "'''": "'''",
+  '/*': '*/', '=begin': '=end', '#|': '|#',
+};
 
 /**
  * Split the thinking-area comment block (injected by main-world.js) off the
@@ -62,22 +82,44 @@ export function extractThinkingArea(code) {
   const lines = code.split('\n');
   let head = 0;
   while (head < lines.length && !lines[head].trim()) head++;
-  const open = head + 1;
-  if (!THINK_HEADER_RE.test(lines[head] ?? '') ||
-      !THINK_DELIM_RE.test((lines[open] ?? '').trim())) {
-    return { notes: '', code };
+  const opener = (lines[head] ?? '').match(THINK_HEADER_RE)?.[1];
+  if (!opener) return { notes: '', code };
+
+  const closer = BLOCK_CLOSER[opener.toLowerCase()];
+  let open, close, strip;
+  if (closer) {
+    // Notes start directly under the header. The closer must be alone on its
+    // line — that is how we write it. Matching it as a substring instead would
+    // end the block early on a note like `careful: */ ends a comment`, which
+    // strands the rest of that note, and the orphaned closer, at the top of
+    // the file we commit as the solution.
+    open = head;
+    close = lines.findIndex((l, i) => i > head && l.trim() === closer);
+    // Monaco continues some block comments with ' * '; users also type bullets.
+    strip = /^[ \t]*\*[ \t]?/;
+  } else {
+    // Legacy: a ruler opens the region and another closes it.
+    open = head + 1;
+    if (!THINK_DELIM_RE.test((lines[open] ?? '').trim())) return { notes: '', code };
+    close = lines.findIndex((l, i) => i > open && THINK_DELIM_RE.test(l.trim()));
+    strip = /^[ \t]*(#|\/\/|--|;|%)[ \t]?/;
   }
-  let close = open + 1;
-  while (close < lines.length && !THINK_DELIM_RE.test(lines[close].trim())) close++;
-  if (close >= lines.length) return { notes: '', code };
-  const notes = lines
-    .slice(open + 1, close)
-    .map((line) => line.replace(/^\s*(#|\/\/|--|;|%)\s?/, ''))
-    .join('\n')
-    .trim();
+  if (close === -1) return { notes: '', code }; // unterminated: leave it alone
+
   let rest = close + 1;
   while (rest < lines.length && !lines[rest].trim()) rest++;
-  return { notes, code: lines.slice(rest).join('\n') };
+  const remaining = lines.slice(rest).join('\n');
+  // A note containing the closer splits the block early, which would strand the
+  // rest of the note — and the orphaned closer — at the top of the file we
+  // commit. Treat that as no block at all rather than write corrupted code.
+  if (closer && (lines[rest] ?? '').trim().includes(closer)) return { notes: '', code };
+
+  const notes = lines
+    .slice(open + 1, close)
+    .map((line) => line.replace(strip, ''))
+    .join('\n')
+    .trim();
+  return { notes, code: remaining };
 }
 
 export function detectLanguage() {

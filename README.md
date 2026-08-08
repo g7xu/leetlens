@@ -45,7 +45,9 @@ Open the extension's Options page, fill owner / repo / branch, paste the token:
 1. **Test connection** → you want the green *"sessions can be saved ✓"*. "repo lookup failed (404)" means the repo isn't granted to the token; "token cannot push" means Contents is still read-only. This step can't verify the Workflows permission — only step 2 exercises it.
 2. **Set up repo for LeetLens** → commits the dashboard workflow and sessions folder into your repo. A 404 here means the token is missing **Workflows: Read and write** (GitHub reports that as "not found", not "forbidden"). If the button couldn't enable GitHub Pages itself, do the one manual step it links: repo *Settings → Pages → Source: **GitHub Actions***.
 
-That's it. Open any LeetCode problem — the LeetLens panel appears, a *thinking area* comment block is added to the editor for sketching your approach, and **Finish → Save to GitHub** commits the session + your code. Your dashboard lives at `https://<owner>.github.io/<repo>/` and rebuilds on every push.
+That's it. Open any LeetCode problem — the LeetLens panel appears, a *thinking area* block comment is added to the top of the editor for sketching your approach, and **Finish → Save to GitHub** commits the session + your code. Your dashboard lives at `https://<owner>.github.io/<repo>/` and rebuilds on every push.
+
+Write as much as you like in the thinking area: it's a block comment, so it never affects your code, time spent there counts as *thinking* rather than *writing*, and its text is read when you finish and used to fill in the session's logic idea. It's stripped from the solution file that gets committed. Languages with no block-comment syntax (Erlang, Elixir, Bash) don't get one — use the logic-idea box on the save form instead.
 
 Your data repo's workflow pins the LeetLens toolchain with `LEETLENS_REF: v1` — a moving major tag that picks up compatible improvements automatically. Pin an exact release tag in your workflow file if you prefer reproducibility.
 
@@ -81,6 +83,35 @@ LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> \
 
 and add it as a connector in ChatGPT → Settings → Connectors (developer mode), e.g. through an `ngrok http 8765` tunnel. Private data repo? Also set `LCP_GITHUB_TOKEN` (the same fine-grained PAT works — Contents: read is enough), which switches fetching from raw.githubusercontent.com to the authenticated Contents API.
 
+<details>
+<summary><b>Reference: tools, prompt, resources, env vars</b></summary>
+
+| Tool | What it answers |
+|---|---|
+| `list_sessions` | Sessions newest first, filterable by tag / difficulty / outcome / date |
+| `get_problem_details` | Everything about one problem: all sessions + committed solution source |
+| `get_stats` | Aggregates per tag, difficulty, week, or month |
+| `get_trends` | A metric as a weekly/monthly time series |
+| `get_weak_areas` | Tags ranked weakest-first, with the scoring components |
+| `list_tags` | All tags with usage counts and last-seen date |
+| `get_revenge_list` | Gave-up problems with no accepted session since |
+| `get_stale_tags` | Tags not practiced in N days |
+| `recommend_next` | "Solve these next" with reasons |
+| `search_notes` | Text search over `logic_idea` and `comments` |
+| `compare_periods` | This month vs last month (or any two periods), with deltas |
+
+Plus the `weekly_review` prompt and two resources: `leetlens://index` and `leetlens://sessions/{dir_key}`.
+
+| Env var | Meaning |
+|---|---|
+| `LCP_REPO_PATH` | Local mode: path to a clone of your data repo |
+| `LCP_SOURCE` | `local` (default) or `github` |
+| `LCP_GITHUB_REPO` | `owner/repo` of your data repo (required in github mode) |
+| `LCP_GITHUB_BRANCH` | Branch to read (default `main`) |
+| `LCP_GITHUB_TOKEN` | Token for private data repos (Contents: read suffices) |
+
+</details>
+
 ## Data model
 
 Each session file records: problem metadata, `started_at`/`ended_at`, ordered phase segments (`thinking|writing|reviewing|debugging`, each `auto` or `manual`), per-phase totals, `run_count` / `failed_run_count` / `submit_count`, `outcome` (`accepted` / `gave_up` / `abandoned`), `logic_idea`, `tags`, `comments`. See `data/schema/session.schema.json` — the schema is the contract for every component.
@@ -88,10 +119,17 @@ Each session file records: problem metadata, `started_at`/`ended_at`, ordered ph
 ## Development
 
 ```bash
+# extension tests (no dependencies — Node's built-in runner)
+node --test 'test/*.test.mjs'
+
 # dashboard against a local data repo
 uv run --directory mcp python -m leetlens_mcp.indexer /path/to/your-data-repo
 python3 -m http.server -d /path/to/your-data-repo 8000
 # then copy dashboard/* next to that data, or open the deployed Pages site
 ```
 
-Contributions welcome — the extension is plain MV3 JavaScript (no build step), the MCP server is a small uv project, and the dashboard is a static page.
+Contributions welcome — the extension is plain MV3 JavaScript (no build step), the MCP server is a small uv project, and the dashboard is a static page. Start with [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit and why, then [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the sharp edges.
+
+## License
+
+[MIT](LICENSE).

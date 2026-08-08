@@ -1,3 +1,7 @@
+// Options page: stores the data-repo settings and drives the two buttons that
+// talk to GitHub (connection test, one-click repo setup). All network calls go
+// through the service worker, which owns the GitHub client.
+
 import { getSettings, saveSettings } from './src/lib/github.js';
 
 const $ = (id) => document.getElementById(id);

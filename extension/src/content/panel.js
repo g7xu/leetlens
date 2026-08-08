@@ -124,6 +124,7 @@ export class Panel {
     });
     this.suggestions = el('div', { className: 'tag-chips' });
     this.comments = el('textarea', { rows: 2, placeholder: 'anything to remember?' });
+    this.codeNote = el('div', { className: 'code-note' });
     const saveBtn = el('button', { className: 'btn-finish', textContent: 'Save to GitHub' });
     saveBtn.addEventListener('click', () => this.cb.onSave(this.formValues()));
     const discardBtn = el('button', { className: 'btn-secondary', textContent: 'Discard' });
@@ -143,6 +144,7 @@ export class Panel {
       this.suggestions,
       el('label', { textContent: 'comments' }),
       this.comments,
+      this.codeNote,
       el('div', { className: 'actions', style: 'margin-top:10px' }, [saveBtn, discardBtn]),
       this.status,
       this.savedActions,
@@ -185,6 +187,21 @@ export class Panel {
     );
   }
 
+  /**
+   * Clear the save form between sessions. The panel outlives a session in a
+   * SPA tab, and showSaveForm deliberately refuses to overwrite a non-empty
+   * logic-idea box — so without this the next problem inherits the last one's
+   * notes, tags and comments.
+   */
+  resetSaveForm() {
+    this.logicIdea.value = '';
+    this.comments.value = '';
+    this.tagInput.value = '';
+    this.tags = [];
+    this.tagChips.replaceChildren();
+    this.codeNote.textContent = '';
+  }
+
   // -- mode switching -----------------------------------------------------
 
   showSaveForm(machine, knownTags) {
@@ -201,11 +218,16 @@ export class Panel {
     for (const phase of PHASES) {
       this.totalInputs[phase].value = (totals[phase] / 60).toFixed(1);
     }
-    // Thinking-area notes (extracted from the editor's comment block) become
+    // Thinking-area notes (read from the editor when the session ended) become
     // the logic-idea draft; never clobber edits already made in the form.
     if (!this.logicIdea.value.trim() && machine.notes?.trim()) {
       this.logicIdea.value = machine.notes;
     }
+    // The form never shows the code, so say which file is about to be pushed
+    // and where it came from — otherwise "Save to GitHub" is confirmed blind.
+    this.codeNote.textContent = machine.typedCode
+      ? `will commit ${machine.problem.dir_key} (${machine.codeLang ?? machine.language ?? 'unknown'})`
+      : 'no code captured — session only, no solution file';
     this.suggestions.replaceChildren(
       ...knownTags.filter((t) => !this.tags.includes(t)).slice(0, 12).map((tag) => {
         const chip = el('span', { className: 'chip', textContent: `+ ${tag}` });

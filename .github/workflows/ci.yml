@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Extension unit tests
+        run: node --test 'test/*.test.mjs'
+
+      - name: Validate the embedded data-repo workflow
+        # The workflow users receive lives as a template literal in
+        # repo-setup.js — a typo there is invisible until it lands in
+        # someone's data repo, so evaluate the literal and parse the YAML.
+        run: |
+          node --input-type=module -e "
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const src = readFileSync('extension/src/lib/repo-setup.js', 'utf8')
+            .replace(/^import .*$/m, '')
+            .replace('const WORKFLOW_YML', 'export const WORKFLOW_YML');
+          writeFileSync('/tmp/repo-setup-extract.mjs', src);
+          const m = await import('/tmp/repo-setup-extract.mjs');
+          writeFileSync('/tmp/embedded-publish.yml', m.WORKFLOW_YML);
+          "
+          python3 -m pip install --quiet pyyaml
+          python3 -c "
+          import yaml
+          d = yaml.safe_load(open('/tmp/embedded-publish.yml'))
+          steps = d['jobs']['build-and-deploy']['steps']
+          assert len(steps) >= 5, 'workflow lost its steps'
+          print(f'embedded workflow OK: {len(steps)} steps')
+          "
+
+      - name: MCP server compiles
+        run: python3 -m compileall -q mcp/src
