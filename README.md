@@ -10,7 +10,7 @@ Like LeetHub, this repo is only the tool. Your data lives in a repo you own — 
 
 | Piece | Where | What it does |
 |---|---|---|
-| Chrome extension | `extension/` | Tracker panel on leetcode.com; commits sessions + solutions to *your* repo; one-click repo setup |
+| Chrome extension | `extension/` → `dist/` | Tracker panel on leetcode.com; commits sessions + solutions to *your* repo; one-click repo setup |
 | Your data repo | `<owner>/<your-repo>` | `data/sessions/<problem>/<timestamp>_<id>.json` per attempt, solutions in LeetHub layout, dashboard on its GitHub Pages |
 | MCP server | `mcp/` | Tools for LLMs: sessions, stats, trends, weak areas — pointed at your data repo |
 | Dashboard | `dashboard/` | Static site; your data repo's workflow deploys it with your data |
@@ -20,7 +20,9 @@ Like LeetHub, this repo is only the tool. Your data lives in a repo you own — 
 
 ### 1. Install the extension
 
-`chrome://extensions` → enable Developer mode → **Load unpacked** → select the `extension/` folder.
+Download `leetlens-<version>.zip` from the [latest release](https://github.com/g7xu/leetlens/releases/latest) and unzip it. Then `chrome://extensions` → enable Developer mode → **Load unpacked** → select the unzipped folder.
+
+Building from source instead? `npm install && npm run build`, then load the generated `dist/` folder.
 
 ### 2. Create (or pick) your data repo
 
@@ -119,8 +121,9 @@ Each session file records: problem metadata, `started_at`/`ended_at`, ordered ph
 ## Development
 
 ```bash
-# extension tests (no dependencies — Node's built-in runner)
-node --test 'test/*.test.mjs'
+npm install            # once — esbuild is the only dependency
+npm run watch          # rebuild dist/ on change; load dist/ as the extension
+npm test               # extension tests (Node's built-in runner, no build needed)
 
 # dashboard against a local data repo
 uv run --directory mcp python -m leetlens_mcp.indexer /path/to/your-data-repo
@@ -128,7 +131,7 @@ python3 -m http.server -d /path/to/your-data-repo 8000
 # then copy dashboard/* next to that data, or open the deployed Pages site
 ```
 
-Contributions welcome — the extension is plain MV3 JavaScript (no build step), the MCP server is a small uv project, and the dashboard is a static page. Start with [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit and why, then [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the sharp edges.
+Contributions welcome — the extension is plain MV3 JavaScript bundled with esbuild, the MCP server is a small uv project, and the dashboard is a static page. Start with [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit and why, then [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the sharp edges.
 
 ## License
 
