@@ -83,6 +83,35 @@ LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> \
 
 and add it as a connector in ChatGPT → Settings → Connectors (developer mode), e.g. through an `ngrok http 8765` tunnel. Private data repo? Also set `LCP_GITHUB_TOKEN` (the same fine-grained PAT works — Contents: read is enough), which switches fetching from raw.githubusercontent.com to the authenticated Contents API.
 
+<details>
+<summary><b>Reference: tools, prompt, resources, env vars</b></summary>
+
+| Tool | What it answers |
+|---|---|
+| `list_sessions` | Sessions newest first, filterable by tag / difficulty / outcome / date |
+| `get_problem_details` | Everything about one problem: all sessions + committed solution source |
+| `get_stats` | Aggregates per tag, difficulty, week, or month |
+| `get_trends` | A metric as a weekly/monthly time series |
+| `get_weak_areas` | Tags ranked weakest-first, with the scoring components |
+| `list_tags` | All tags with usage counts and last-seen date |
+| `get_revenge_list` | Gave-up problems with no accepted session since |
+| `get_stale_tags` | Tags not practiced in N days |
+| `recommend_next` | "Solve these next" with reasons |
+| `search_notes` | Text search over `logic_idea` and `comments` |
+| `compare_periods` | This month vs last month (or any two periods), with deltas |
+
+Plus the `weekly_review` prompt and two resources: `leetlens://index` and `leetlens://sessions/{dir_key}`.
+
+| Env var | Meaning |
+|---|---|
+| `LCP_REPO_PATH` | Local mode: path to a clone of your data repo |
+| `LCP_SOURCE` | `local` (default) or `github` |
+| `LCP_GITHUB_REPO` | `owner/repo` of your data repo (required in github mode) |
+| `LCP_GITHUB_BRANCH` | Branch to read (default `main`) |
+| `LCP_GITHUB_TOKEN` | Token for private data repos (Contents: read suffices) |
+
+</details>
+
 ## Data model
 
 Each session file records: problem metadata, `started_at`/`ended_at`, ordered phase segments (`thinking|writing|reviewing|debugging`, each `auto` or `manual`), per-phase totals, `run_count` / `failed_run_count` / `submit_count`, `outcome` (`accepted` / `gave_up` / `abandoned`), `logic_idea`, `tags`, `comments`. See `data/schema/session.schema.json` — the schema is the contract for every component.
@@ -99,4 +128,8 @@ python3 -m http.server -d /path/to/your-data-repo 8000
 # then copy dashboard/* next to that data, or open the deployed Pages site
 ```
 
-Contributions welcome — the extension is plain MV3 JavaScript (no build step), the MCP server is a small uv project, and the dashboard is a static page.
+Contributions welcome — the extension is plain MV3 JavaScript (no build step), the MCP server is a small uv project, and the dashboard is a static page. Start with [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit and why, then [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the sharp edges.
+
+## License
+
+[MIT](LICENSE).
