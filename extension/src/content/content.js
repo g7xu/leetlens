@@ -1,15 +1,16 @@
 // Isolated-world orchestrator: owns the session machine + panel lifecycle,
 // bridges MAIN-world events, persists state, and hands finished sessions to
 // the service worker for the GitHub commit.
+//
+// The build inlines these imports (see build.mjs) — Chrome loads this as a
+// classic script, so nothing may remain in the output.
+import { SessionMachine } from '../state/session-machine.js';
+import { Panel } from './panel.js';
+import * as endpoints from '../lib/leetcode-endpoints.js';
+
 (async () => {
   if (window.__leetlensLoaded) return;
   window.__leetlensLoaded = true;
-
-  const [{ SessionMachine }, { Panel }, endpoints] = await Promise.all([
-    import(chrome.runtime.getURL('src/state/session-machine.js')),
-    import(chrome.runtime.getURL('src/content/panel.js')),
-    import(chrome.runtime.getURL('src/lib/leetcode-endpoints.js')),
-  ]);
 
   const HEARTBEAT_MS = 15_000;
   const STALE_AFTER_MS = 45 * 60_000;

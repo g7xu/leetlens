@@ -18,9 +18,26 @@ Data repos pin the toolchain with `LEETLENS_REF: v1`, a **moving major tag**:
 
 **Sharp edge:** the workflow file is *copied* into each data repo at setup time, so moving the tag ships fixes to the toolchain under `.leetlens/` but **not** to the workflow itself. A workflow bug means every existing data repo must re-run Set up repo. Keep the workflow thin; put logic where the tag can carry it.
 
+## Build
+
+Sources live in `extension/`; `npm run build` bundles them into `dist/`, which is what Chrome loads. `dist/` is gitignored — users get it as a zip attached to each release.
+
+Four entry points, and the output format is not a preference:
+
+| Entry | Output | Format |
+|---|---|---|
+| `src/inject/main-world.js` | `dist/main-world.js` | `iife` — classic script |
+| `src/content/content.js` | `dist/content.js` | `iife` — classic script |
+| `src/background/service-worker.js` | `dist/service-worker.js` | `esm` — manifest declares `"type": "module"` |
+| `extension/options.js` | `dist/options.js` | `esm` — `options.html` uses `type="module"` |
+
+Chrome loads content scripts as **classic scripts**, so an `import` surviving into either of the first two is a runtime error; CI parses both as CommonJS to catch it. A format mismatch on the latter two fails registration with no useful error, which is why they are pinned rather than left to default.
+
+Bundling is also what lets `main-world.js` share code at all: it has no `chrome.*`, so the dynamic-`import(chrome.runtime.getURL(...))` trick other content scripts use is unavailable to it. That trick is what `web_accessible_resources` used to exist for; bundling removed both.
+
 ## Extension layout
 
-The split below is not a style choice — **Chrome's extension worlds force it**. A MAIN-world script can touch the page's JavaScript (Monaco, `fetch`) but no `chrome.*` APIs and no ES imports; an isolated-world content script is the reverse; only the service worker outlives the tab.
+The split below is not a style choice — **Chrome's extension worlds force it**. A MAIN-world script can touch the page's JavaScript (Monaco, `fetch`) but no `chrome.*` APIs; an isolated-world content script is the reverse; only the service worker outlives the tab. (Neither can use ES modules *at runtime* — the bundler resolves that at build time, so you can still `import` freely in the sources.)
 
 | File | World | Role |
 |---|---|---|

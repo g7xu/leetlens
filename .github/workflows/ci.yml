@@ -14,14 +14,42 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
+      - run: npm ci
 
       - name: Extension unit tests
+        # Deliberately against extension/src, not dist/ — tests must never
+        # need a build to run.
         run: node --test 'test/*.test.mjs'
+
+      - name: Build the extension
+        run: npm run build
+
+      - name: No module syntax in the classic content scripts
+        # main-world.js and content.js are loaded as classic scripts, so a
+        # surviving import/export is a runtime error Chrome reports only in
+        # the page console. Parsing them as CommonJS rejects both.
+        run: |
+          cp dist/main-world.js /tmp/main-world.cjs
+          cp dist/content.js /tmp/content.cjs
+          node --check /tmp/main-world.cjs
+          node --check /tmp/content.cjs
+          node -e "
+          const fs = require('node:fs');
+          const m = JSON.parse(fs.readFileSync('dist/manifest.json', 'utf8'));
+          const refs = [m.background.service_worker, ...m.content_scripts.flatMap(c => c.js), m.options_page];
+          const missing = refs.filter((r) => !fs.existsSync('dist/' + r));
+          if (missing.length) throw new Error('manifest references missing files: ' + missing);
+          console.log('manifest references all resolve');
+          "
 
       - name: Validate the embedded data-repo workflow
         # The workflow users receive lives as a template literal in
         # repo-setup.js — a typo there is invisible until it lands in
         # someone's data repo, so evaluate the literal and parse the YAML.
+        # This reads SOURCE on purpose: the text surgery below would silently
+        # mangle a bundled file, where esbuild may rename WORKFLOW_YML.
         run: |
           node --input-type=module -e "
           import { readFileSync, writeFileSync } from 'node:fs';

@@ -5,3 +5,9 @@ venv/
 .DS_Store
 uv.lock
 _site/
+
+# Build output: dist/ is generated from extension/ by `npm run build`.
+# Load dist/ as the unpacked extension; never edit or commit it.
+node_modules/
+dist/
+*.zip

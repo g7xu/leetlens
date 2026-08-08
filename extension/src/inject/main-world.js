@@ -2,8 +2,10 @@
 // network traffic (never blocks or modifies it) and reports events to the
 // content script via window.postMessage. Holds no state beyond pending ids.
 //
-// NOTE: this file cannot import modules (MAIN-world content script), so the
-// LeetCode URL patterns live here; DOM selectors live in src/lib/leetcode-endpoints.js.
+// Chrome loads this as a *classic* script and gives it no chrome.* APIs, so it
+// can neither `import` nor reach for chrome.runtime.getURL. The build bundles
+// it into one self-contained IIFE (see build.mjs); nothing may remain in the
+// output that the browser would have to resolve at runtime.
 (() => {
   'use strict';
 
