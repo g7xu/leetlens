@@ -45,7 +45,9 @@ Open the extension's Options page, fill owner / repo / branch, paste the token:
 1. **Test connection** → you want the green *"sessions can be saved ✓"*. "repo lookup failed (404)" means the repo isn't granted to the token; "token cannot push" means Contents is still read-only. This step can't verify the Workflows permission — only step 2 exercises it.
 2. **Set up repo for LeetLens** → commits the dashboard workflow and sessions folder into your repo. A 404 here means the token is missing **Workflows: Read and write** (GitHub reports that as "not found", not "forbidden"). If the button couldn't enable GitHub Pages itself, do the one manual step it links: repo *Settings → Pages → Source: **GitHub Actions***.
 
-That's it. Open any LeetCode problem — the LeetLens panel appears, a *thinking area* comment block is added to the editor for sketching your approach, and **Finish → Save to GitHub** commits the session + your code. Your dashboard lives at `https://<owner>.github.io/<repo>/` and rebuilds on every push.
+That's it. Open any LeetCode problem — the LeetLens panel appears, a *thinking area* block comment is added to the top of the editor for sketching your approach, and **Finish → Save to GitHub** commits the session + your code. Your dashboard lives at `https://<owner>.github.io/<repo>/` and rebuilds on every push.
+
+Write as much as you like in the thinking area: it's a block comment, so it never affects your code, time spent there counts as *thinking* rather than *writing*, and its text is read when you finish and used to fill in the session's logic idea. It's stripped from the solution file that gets committed. Languages with no block-comment syntax (Erlang, Elixir, Bash) don't get one — use the logic-idea box on the save form instead.
 
 Your data repo's workflow pins the LeetLens toolchain with `LEETLENS_REF: v1` — a moving major tag that picks up compatible improvements automatically. Pin an exact release tag in your workflow file if you prefer reproducibility.
 
@@ -88,6 +90,9 @@ Each session file records: problem metadata, `started_at`/`ended_at`, ordered ph
 ## Development
 
 ```bash
+# extension tests (no dependencies — Node's built-in runner)
+node --test 'test/*.test.mjs'
+
 # dashboard against a local data repo
 uv run --directory mcp python -m leetlens_mcp.indexer /path/to/your-data-repo
 python3 -m http.server -d /path/to/your-data-repo 8000

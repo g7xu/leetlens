@@ -110,20 +110,81 @@
     if (notes) machine.notes = notes;
   }
 
+  /**
+   * Ask the MAIN world for the editor's current contents. Run/submit bodies
+   * only tell us what the code was at the last run, so notes written (or
+   * revised) afterwards — and every give-up with no run at all — would
+   * otherwise never be recorded.
+   *
+   * Uses its own listener rather than the dispatcher below, which drops
+   * messages once the session has ended. Resolves null if the MAIN world
+   * doesn't answer, so finishing never hangs on a missing injector.
+   */
+  function requestEditorCode(timeoutMs = 250) {
+    return new Promise((resolve) => {
+      const id = crypto.randomUUID();
+      let done = false;
+      const finish = (value) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        window.removeEventListener('message', onMessage);
+        resolve(value);
+      };
+      const onMessage = (event) => {
+        if (event.source !== window || event.data?.source !== 'leetlens') return;
+        if (event.data.type !== 'EDITOR_CODE' || event.data.payload?.id !== id) return;
+        finish(event.data.payload);
+      };
+      const timer = setTimeout(() => finish(null), timeoutMs);
+      window.addEventListener('message', onMessage);
+      window.postMessage(
+        { source: 'leetlens-req', type: 'GET_EDITOR_CODE', id },
+        window.location.origin,
+      );
+    });
+  }
+
+  let ending = false;
+
   async function endSession(outcome) {
-    if (!machine || machine.ended) return;
+    if (!machine || machine.ended || ending) return;
     if (!contextAlive()) {
       orphanTeardown();
       return;
     }
-    machine.end(outcome);
-    machine.language = endpoints.detectLanguage();
-    persist();
-    panel.showSaveForm(machine, await getSuggestedTags());
+    // Guards above are synchronous; the await below opens a window in which a
+    // second Finish click or an accepted SUBMIT_RESULT could re-enter.
+    ending = true;
+    try {
+      const live = await requestEditorCode();
+      // teardown() or an orphaned context can null the machine mid-await.
+      if (!machine || machine.ended) return;
+      if (live?.code != null) {
+        const { notes, code } = endpoints.extractThinkingArea(live.code);
+        // The editor is authoritative here, so clearing the notes counts too —
+        // unlike the run/submit path, which must not clobber with empty.
+        machine.notes = notes;
+        // Only fill a gap: a session with no run has no captured code at all
+        // and would commit no solution file. Never overwrite code that earned
+        // an Accepted with whatever happens to be in the editor now.
+        if (!machine.typedCode) machine.captureCode(code, live.lang);
+      }
+      machine.end(outcome);
+      machine.language = endpoints.detectLanguage();
+      persist();
+      panel.showSaveForm(machine, await getSuggestedTags());
+    } finally {
+      ending = false;
+    }
   }
 
   function freshSession(problem) {
     machine = new SessionMachine(problem);
+    // The save form keeps whatever the last session left in it, and its
+    // prefill refuses to overwrite a non-empty box — so without this the
+    // second problem solved in one tab silently inherits the first's notes.
+    panel.resetSaveForm();
     persist();
     panel.showLiveView();
     panel.update(machine);
@@ -195,11 +256,9 @@
       onSave: (values) => saveSession(values),
       onDiscard: async () => { await clearStored(currentSlug); freshSession(machine?.problem ?? problem); },
       onResume: () => { panel.showLiveView(); startLoops(); },
-      onResumeAbandon: async () => {
-        machine.end('abandoned');
-        machine.language = endpoints.detectLanguage();
-        panel.showSaveForm(machine, await getSuggestedTags());
-      },
+      // Routed through endSession so an abandoned session gets the same
+      // editor read as Finish and Give up.
+      onResumeAbandon: () => endSession('abandoned'),
       onResumeDiscard: async () => { await clearStored(currentSlug); freshSession(problem); },
     });
     panel.setProblem(`${problem.frontend_id}. ${problem.title}`);
@@ -274,16 +333,39 @@
     panel?.update(machine);
   });
 
-  // First keystroke in the editor flips thinking -> writing.
+  // First keystroke in the editor flips thinking -> writing — but only when it
+  // lands in the code. Typing in the thinking area is still thinking, and
+  // counting it as writing would zero out the phase the tool exists to measure.
+  let caretProbeInFlight = false;
+
   document.addEventListener(
     'input',
     (event) => {
       if (!machine || machine.ended) return;
-      if (event.target?.closest?.(endpoints.EDITOR_SELECTOR) ||
-          event.target?.classList?.contains('inputarea')) {
+      if (!(event.target?.closest?.(endpoints.EDITOR_SELECTOR) ||
+            event.target?.classList?.contains('inputarea'))) return;
+      // Typing is activity wherever it lands, so un-pausing must not depend on
+      // the caret check below.
+      machine.resume();
+      // The flip happens once. After it, editorInput() can no longer change
+      // the phase, so skip asking the MAIN world where the caret is.
+      if (machine.hasWritten || machine.currentPhase !== 'thinking') {
         machine.editorInput();
         panel?.update(machine);
+        return;
       }
+      // At most one probe outstanding: this fires per keystroke while the user
+      // is still in the thinking phase.
+      if (caretProbeInFlight) return;
+      caretProbeInFlight = true;
+      requestEditorCode().then((live) => {
+        caretProbeInFlight = false;
+        // No answer means no injector — fall back to the old behaviour rather
+        // than never leaving the thinking phase.
+        if (!machine || machine.ended || live?.cursorInNotes) return;
+        machine.editorInput();
+        panel?.update(machine);
+      });
     },
     true,
   );

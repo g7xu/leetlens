@@ -119,55 +119,158 @@
   // gets sketched where the user already is — in the editor — before coding.
   // The content script later strips this block from the captured code and
   // turns it into the session's logic-idea draft.
-
+  //
+  // It must be a *block* comment. Monaco does not re-insert a line-comment
+  // token when the user presses Enter, so a `#`-prefixed region only protects
+  // the lines we pre-write — the next line of notes would be parsed as code.
+  //
   // LeetCode registers Monaco languages under its own slugs (model
   // .getLanguageId() returns 'python3', 'golang', 'oraclesql', …), so match
   // those — not Monaco's standard ids.
-  function commentToken(langId) {
-    if (['python', 'python3', 'ruby', 'elixir', 'bash', 'shell'].includes(langId)) return '#';
-    if (['sql', 'mysql', 'mssql', 'oraclesql', 'postgresql', 'pgsql'].includes(langId)) return '--';
-    if (['racket', 'scheme', 'lisp'].includes(langId)) return ';';
-    if (langId === 'erlang') return '%';
-    return '//';
+  function blockDelimiters(langId) {
+    // r-string: notes containing \d or a Windows path would otherwise raise
+    // SyntaxWarning on Python 3.12+.
+    if (['python', 'python3', 'pythondata'].includes(langId)) return ['r"""', '"""'];
+    if (langId === 'ruby') return ['=begin', '=end']; // must stay at column 0
+    if (langId === 'racket') return ['#|', '|#'];
+    // No block-comment form exists in these, and a region that breaks the
+    // moment you press Enter is worse than none — those users still have the
+    // logic-idea box on the save form.
+    if (['erlang', 'elixir', 'bash', 'shell'].includes(langId)) return null;
+    return ['/*', '*/']; // C family, and every SQL dialect LeetCode offers
   }
 
-  const THINK_HEADER_RE = /^\s*(?:#|\/\/|--|;|%)\s*Thinking area\b/im;
+  // Must accept every opener blockDelimiters can write, or a block restored by
+  // LeetCode's cloud save goes unrecognised and a second one is prepended on
+  // every reload. Mirrors THINK_HEADER_RE in src/lib/leetcode-endpoints.js —
+  // keep the two in sync; test/thinking-area.test.mjs pins the shapes.
+  const THINK_HEADER_RE =
+    /^[ \t]*(?:r?"""|'''|\/\*|=begin|#\||#|\/\/|--|;|%)[ \t]*Thinking area\b/im;
   const NON_CODE_LANGS = new Set(['plaintext', 'json', 'markdown']);
   const injectedKeys = new Set();
 
   function thinkingBlock(langId) {
-    const token = commentToken(langId);
-    const delim = token[0].repeat(18);
-    return `${token} Thinking area\n${delim}\n\n\n\n${delim}\n\n`;
+    const block = blockDelimiters(langId);
+    return block && `${block[0]} Thinking area\n\n\n\n${block[1]}\n\n`;
+  }
+
+  /**
+   * The model the user is actually solving in. getModels() also returns the
+   * editorial and solution playgrounds LeetCode mounts on the same page, and
+   * its order is unspecified, so injecting into all of them (or trusting the
+   * first) puts thinking areas in the wrong editors.
+   */
+  function pickEditorModel() {
+    const models = window.monaco?.editor?.getModels?.() ?? [];
+    const usable = models.filter((m) => {
+      const lang = m.getLanguageId?.();
+      return lang && !NON_CODE_LANGS.has(lang);
+    });
+    if (usable.length <= 1) return usable[0] ?? null;
+    // Playgrounds are read-only; the solve editor is not.
+    const editors = window.monaco?.editor?.getEditors?.() ?? [];
+    const writable = editors.filter((e) => {
+      try {
+        return e.getContainerDomNode?.()?.isConnected &&
+          !e.getOption?.(window.monaco.editor.EditorOption.readOnly);
+      } catch {
+        return false;
+      }
+    });
+    const focused = writable.find((e) => e.hasTextFocus?.())?.getModel?.();
+    if (focused && usable.includes(focused)) return focused;
+    const writableModel = writable.map((e) => e.getModel?.()).find((m) => usable.includes(m));
+    if (writableModel) return writableModel;
+    // LeetCode's own record of the selected editor language; localStorage is
+    // shared across worlds on this origin.
+    try {
+      const selected = JSON.parse(window.localStorage.getItem('global_lang') ?? '""');
+      const byLang = usable.find((m) => m.getLanguageId?.() === selected);
+      if (byLang) return byLang;
+    } catch {
+      /* fall through */
+    }
+    return usable.find((m) => THINK_HEADER_RE.test(m.getValue())) ?? usable[0];
   }
 
   function ensureThinkingArea() {
-    const models = window.monaco?.editor?.getModels?.();
-    if (!models) return;
     const slug = (window.location.pathname.match(/^\/problems\/([^/]+)/) || [])[1];
     if (!slug) return;
-    for (const model of models) {
-      try {
-        const lang = model.getLanguageId?.();
-        if (!lang || NON_CODE_LANGS.has(lang)) continue;
-        const key = `${slug}:${lang}`;
-        if (injectedKeys.has(key)) continue; // once per problem+language: deleting it is respected
-        const value = model.getValue();
-        if (!value.trim()) continue; // template not loaded yet — retry next tick
-        injectedKeys.add(key);
-        if (THINK_HEADER_RE.test(value)) continue; // restored by LeetCode's own cloud save
-        model.pushEditOperations(
-          [],
-          [{ range: new window.monaco.Range(1, 1, 1, 1), text: thinkingBlock(lang) }],
-          () => null,
-        );
-      } catch {
-        /* never let injection break the editor */
-      }
+    try {
+      const model = pickEditorModel();
+      const lang = model?.getLanguageId?.();
+      if (!lang) return;
+      const key = `${slug}:${lang}`;
+      if (injectedKeys.has(key)) return; // once per problem+language: deleting it is respected
+      const value = model.getValue();
+      if (!value.trim()) return; // template not loaded yet — retry next tick
+      const block = thinkingBlock(lang);
+      if (!block) return; // language has no safe block-comment form
+      injectedKeys.add(key);
+      if (THINK_HEADER_RE.test(value)) return; // restored by LeetCode's own cloud save
+      model.pushEditOperations(
+        [],
+        [{ range: new window.monaco.Range(1, 1, 1, 1), text: block }],
+        () => null,
+      );
+    } catch {
+      /* never let injection break the editor */
     }
   }
 
   setInterval(ensureThinkingArea, 1000);
+
+  /**
+   * Where the caret sits relative to the thinking block, so the content script
+   * can tell note-taking apart from coding — otherwise the first keystroke in
+   * the block flips the session from the thinking phase to writing, and using
+   * the feature zeroes out the metric it exists to measure.
+   */
+  function cursorInThinkingArea() {
+    try {
+      const editor = (window.monaco?.editor?.getEditors?.() ?? [])
+        .find((e) => e.hasTextFocus?.());
+      const model = editor?.getModel?.();
+      const line = editor?.getPosition?.()?.lineNumber;
+      if (!model || !line) return false;
+      const lines = model.getValue().split('\n');
+      let head = 0;
+      while (head < lines.length && !lines[head].trim()) head++;
+      if (!THINK_HEADER_RE.test(lines[head] ?? '')) return false;
+      const block = blockDelimiters(model.getLanguageId?.());
+      if (!block) return false;
+      const close = lines.findIndex((l, i) => i > head && l.trim() === block[1]);
+      // lineNumber is 1-based; head/close are 0-based indices.
+      return close !== -1 && line - 1 >= head && line - 1 <= close;
+    } catch {
+      return false;
+    }
+  }
+
+  // -- requests from the content script ----------------------------------
+  // The content script pulls the editor contents when the user finishes a
+  // session. Requests carry their own source tag so this listener never sees
+  // its own emit() traffic, and content.js's dispatcher ignores the request.
+  window.addEventListener('message', (event) => {
+    if (event.source !== window || event.origin !== window.location.origin) return;
+    const { source, type, id } = event.data ?? {};
+    if (source !== `${SOURCE}-req` || type !== 'GET_EDITOR_CODE') return;
+    let payload = { id, code: null, lang: null, cursorInNotes: false };
+    try {
+      const model = pickEditorModel();
+      if (model) {
+        payload = {
+          id,
+          code: model.getValue(),
+          lang: model.getLanguageId?.() ?? null,
+          cursorInNotes: cursorInThinkingArea(),
+        };
+      }
+    } catch {
+      /* reply with nulls: the caller treats it as "no reading available" */
+    }
+    emit('EDITOR_CODE', payload);
+  });
 
   // LeetCode is a SPA: surface URL changes so the tracker can switch problems.
   const emitUrlChange = () => emit('URL_CHANGED', { href: window.location.href });

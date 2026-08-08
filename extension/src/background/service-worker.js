@@ -36,10 +36,11 @@ function commitMessage(record) {
 
 // LeetCode language slug -> file extension (LeetHub layout: <dir_key>/<dir_key>.<ext>).
 const LANG_EXT = {
-  python: 'py', python3: 'py', cpp: 'cpp', c: 'c', java: 'java',
+  python: 'py', python3: 'py', pythondata: 'py', cpp: 'cpp', c: 'c', java: 'java',
   javascript: 'js', typescript: 'ts', golang: 'go', rust: 'rs',
   csharp: 'cs', kotlin: 'kt', swift: 'swift', ruby: 'rb', scala: 'scala',
   php: 'php', dart: 'dart', racket: 'rkt', erlang: 'erl', elixir: 'ex',
+  bash: 'sh', shell: 'sh',
   mysql: 'sql', mssql: 'sql', oraclesql: 'sql', postgresql: 'sql',
 };
 
