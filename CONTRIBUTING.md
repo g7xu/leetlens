@@ -54,14 +54,24 @@ Hard-won; check here before debugging from scratch.
 
 ## Maintainer notes
 
-**Releases.** Bump `version` in `extension/manifest.json` (the single source of truth — `package.json` deliberately has none). Then tag `vX.Y.Z` on main, build and attach the extension zip, and move the major tag:
+**Two version numbers, deliberately.** They track different things and will not match:
+
+| Number | Where | Means |
+|---|---|---|
+| Repo tag `vX.Y.Z` (and the moving `v1`) | git tags | The **toolchain** version. Data repos pin it via `LEETLENS_REF` and check this repo out at that tag to get `dashboard/` and `mcp/`. |
+| `version` in `extension/manifest.json` | manifest | The **extension** version Chrome shows. `package.json` deliberately has none, so there is one source of truth. |
+
+The zip is named from the manifest version, so `leetlens-0.2.0.zip` can legitimately be attached to release `v1.1.0`. Say so in the release notes or people will assume it is a mistake.
+
+**Cutting a release.** Bump `extension/manifest.json` if the extension itself changed, then from an up-to-date `main`:
 
 ```bash
-npm run zip                                    # → leetlens-<version>.zip from a release build
-gh release create vX.Y.Z leetlens-<version>.zip
-git tag -f v1 vX.Y.Z && git push -f origin v1
+npm run zip                                     # → leetlens-<manifest version>.zip
+git tag vX.Y.Z && git push origin vX.Y.Z
+gh release create vX.Y.Z leetlens-*.zip --title "..." --notes "..."
+git tag -f v1 vX.Y.Z && git push -f origin v1   # compatible changes only
 ```
 
-The zip is what users install, so a release without it leaves people with no way to get the extension. Data repos consume `v1` via `LEETLENS_REF`; breaking changes get a new major tag instead of moving `v1`. Remember the workflow file itself is copied into data repos at setup — tag moves don't update it.
+The zip is how people install the extension, so **a release without it leaves users with no way to get it** — that is exactly what happened with v1.0.0. Breaking changes (schema, index shape, dashboard data contract) get a new major tag instead of moving `v1`. Remember the data-repo workflow file is copied into each data repo at setup, so tag moves don't update it.
 
 **Pages deploys.** Retry a failed deploy with a fresh `workflow_dispatch` run — never `gh run rerun`, which duplicates the `github-pages` artifact and the deploy step rejects it.

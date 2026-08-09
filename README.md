@@ -20,9 +20,20 @@ Like LeetHub, this repo is only the tool. Your data lives in a repo you own — 
 
 ### 1. Install the extension
 
-Download `leetlens-<version>.zip` from the [latest release](https://github.com/g7xu/leetlens/releases/latest) and unzip it. Then `chrome://extensions` → enable Developer mode → **Load unpacked** → select the unzipped folder.
+Build it — needs [Node](https://nodejs.org/) 20+:
 
-Building from source instead? `npm install && npm run build`, then load the generated `dist/` folder.
+```bash
+git clone https://github.com/g7xu/leetlens.git
+cd leetlens
+npm install
+npm run build
+```
+
+Then `chrome://extensions` → enable Developer mode → **Load unpacked** → select the generated **`dist/`** folder.
+
+> `dist/` is what Chrome loads; `extension/` holds the sources and has no manifest at its top level. If you previously loaded `extension/`, remove that entry first — Chrome keeps running the old copy otherwise.
+
+Prefer not to build? Recent [releases](https://github.com/g7xu/leetlens/releases) attach a ready-to-load `leetlens-<version>.zip` — download, unzip, and load that folder instead. (Releases before v1.1.0 predate the build and have no zip.)
 
 ### 2. Create (or pick) your data repo
 
