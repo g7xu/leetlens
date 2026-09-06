@@ -31,6 +31,10 @@ def build_index(root: Path) -> dict:
         "sessions": [stats.session_summary(r) for r in records],
         "tags": stats.by_tag(records),
         "daily": stats.daily_activity(records),
+        # Full records, so a remote reader (the hosted MCP server) needs this one
+        # file and no per-session fetches. The workflow that lands in every data
+        # repo commits and deploys only index.json, so nothing else can carry them.
+        "records": records,
     }
 
 

@@ -156,3 +156,24 @@ def records() -> list[dict]:
             ),
         ]
     )
+
+
+def write_data_repo(root, records: list[dict], solutions: dict[str, str] | None = None):
+    """Lay `records` out as a data repo (data/sessions/<dir_key>/<stamp>_<id>.json)."""
+    import json
+
+    for rec in records:
+        rec = {k: v for k, v in rec.items() if k != "attempt_number"}
+        folder = root / "data" / "sessions" / rec["problem"]["dir_key"]
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = rec["started_at"].replace(":", "-")
+        (folder / f"{stamp}_{rec['session_id']}.json").write_text(json.dumps(rec, indent=2) + "\n")
+    for dir_key, source in (solutions or {}).items():
+        (root / dir_key).mkdir(exist_ok=True)
+        (root / dir_key / f"{dir_key}.py").write_text(source)
+    return root
+
+
+@pytest.fixture
+def data_repo(tmp_path, records):
+    return write_data_repo(tmp_path, records, {"0322-coin-change": "def coinChange(): ...\n"})

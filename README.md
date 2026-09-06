@@ -87,7 +87,7 @@ Claude Desktop (`claude_desktop_config.json`):
 }
 ```
 
-To run without a clone (e.g. remote/ChatGPT), fetch straight from GitHub over streamable HTTP:
+To run without a clone (e.g. remote/ChatGPT), read the data repo's generated `data/index.json` straight from GitHub (one request; the repo must have been set up and pushed once) over streamable HTTP:
 
 ```bash
 LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> \
