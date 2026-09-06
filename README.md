@@ -87,14 +87,18 @@ Claude Desktop (`claude_desktop_config.json`):
 }
 ```
 
-To run without a clone (e.g. remote/ChatGPT), read the data repo's generated `data/index.json` straight from GitHub (one request; the repo must have been set up and pushed once) over streamable HTTP:
+**No install at all: the hosted server.** One public endpoint serves any public data repo; put your owner and repo in the URL:
 
 ```bash
-LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> \
-  uv run --directory mcp leetlens-mcp --transport streamable-http --port 8765
+claude mcp add --transport http leetlens https://leetlens-mcp.vercel.app/<owner>/<your-data-repo>/mcp
 ```
 
-and add it as a connector in ChatGPT → Settings → Connectors (developer mode), e.g. through an `ngrok http 8765` tunnel. The `search` / `fetch` pair follows ChatGPT's connector contract, so deep research can use the server too. Private data repo? Also set `LCP_GITHUB_TOKEN` (the same fine-grained PAT works — Contents: read is enough), which switches fetching from raw.githubusercontent.com to the authenticated Contents API.
+The same URL works as a custom connector in Claude.ai (Settings → Connectors) and in ChatGPT (Settings → Connectors, developer mode); the `search` / `fetch` pair follows ChatGPT's connector contract, so deep research can use it too. The server reads your repo's generated `data/index.json`, so the repo must be public and set up with the extension (one push after **Set up repo** is enough). Private data repo? Run the server yourself against a local clone (above) or fetch from GitHub with a token:
+
+```bash
+LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> LCP_GITHUB_TOKEN=<fine-grained PAT, Contents: read> \
+  uv run --directory mcp leetlens-mcp --transport http --port 8765
+```
 
 <details>
 <summary><b>Reference: tools, prompt, resources, env vars</b></summary>

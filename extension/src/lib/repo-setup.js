@@ -13,6 +13,9 @@ const TOOL_REF = 'v1';
 
 const WORKFLOW_PATH = '.github/workflows/publish.yml';
 
+// The maintainer's deployment of mcp/app.py; serves any public data repo.
+const HOSTED_MCP = 'https://leetlens-mcp.vercel.app';
+
 export const WORKFLOW_YML = `name: publish
 
 on:
@@ -162,8 +165,10 @@ what they solved.
 
 \`.mcp.json\` in this repo starts the LeetLens MCP server for Claude Code; it
 exposes these questions as tools (\`get_weak_areas\`, \`get_revenge_list\`,
-\`recommend_next\`, \`search\`, \`fetch\`, \`export_sessions\`, ...). Without it, the
-JSON files above are enough: \`data/index.json\` has every record.
+\`recommend_next\`, \`search\`, \`fetch\`, \`export_sessions\`, ...). Chat clients
+(Claude.ai, ChatGPT, Claude Desktop) can use the hosted copy instead, if this
+repo is public: \`${HOSTED_MCP}/<owner>/<repo>/mcp\`. Without either, the JSON
+files above are enough: \`data/index.json\` has every record.
 `;
 
 export const CLAUDE_MD = `@AGENTS.md
