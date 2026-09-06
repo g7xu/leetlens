@@ -15,7 +15,7 @@ const TOOL_REF = 'v2';
 const WORKFLOW_PATH = '.github/workflows/publish.yml';
 
 // The maintainer's deployment of mcp/app.py; serves any public data repo.
-const HOSTED_MCP = 'https://leetlens-mcp.vercel.app';
+export const HOSTED_MCP = 'https://leetlens-mcp.vercel.app';
 
 export const WORKFLOW_YML = `name: publish
 
