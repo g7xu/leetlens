@@ -114,6 +114,7 @@ and add it as a connector in ChatGPT → Settings → Connectors (developer mode
 | `recommend_next` | "Solve these next" with reasons |
 | `search_notes` | Text search over `logic_idea` and `comments` |
 | `compare_periods` | This month vs last month (or any two periods), with deltas |
+| `export_sessions` | Every full session record as JSONL or JSON, filterable by date and tag, so the model can run its own analysis |
 
 Plus the `weekly_review` prompt and two resources: `leetlens://index` and `leetlens://sessions/{dir_key}`.
 

@@ -153,6 +153,21 @@ def compare_periods(period_a: str = "this_month", period_b: str = "last_month") 
         return {"error": str(err)}
 
 
+@mcp.tool()
+def export_sessions(
+    date_from: str | None = None,
+    date_to: str | None = None,
+    tag: str | None = None,
+    format: Literal["jsonl", "json"] = "jsonl",
+) -> str:
+    """Every matching session record in full (phases, per-phase seconds, run counts, notes, tags, attempt_number), newest first, as JSONL (one record per line) or a JSON array. Nothing is summarised: use this to run your own analysis instead of relying on the built-in scores. Dates are YYYY-MM-DD, inclusive."""
+    rows = stats.filter_records(store.load_sessions(), date_from, date_to, tag)
+    rows = sorted(rows, key=lambda r: r["started_at"], reverse=True)
+    if format == "json":
+        return json.dumps(rows)
+    return "\n".join(json.dumps(r) for r in rows)
+
+
 @mcp.prompt()
 def weekly_review() -> str:
     """Weekly practice review: last 7 days, weak areas, and a plan for next week."""

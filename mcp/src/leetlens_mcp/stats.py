@@ -219,6 +219,23 @@ def stale_tags(records: list[dict], days: int = 30, today: date | None = None) -
     return out
 
 
+def filter_records(
+    records: list[dict],
+    date_from: str | None = None,
+    date_to: str | None = None,
+    tag: str | None = None,
+) -> list[dict]:
+    """Records started within [date_from, date_to] (inclusive YYYY-MM-DD) that carry `tag`; None means no bound."""
+    out = records
+    if date_from:
+        out = [r for r in out if _date(r) >= date_from]
+    if date_to:
+        out = [r for r in out if _date(r) <= date_to]
+    if tag:
+        out = [r for r in out if tag in r.get("tags", [])]
+    return out
+
+
 def search_notes(records: list[dict], query: str, limit: int = 20) -> list[dict]:
     """Case-insensitive substring search over logic_idea and comments, newest first."""
     q = query.lower()
