@@ -25,7 +25,7 @@ Then `chrome://extensions` → enable Developer mode → **Load unpacked** → s
 
 > `dist/` is what Chrome loads; `extension/` holds the sources and has no manifest at its top level. If you previously loaded `extension/`, remove that entry first — Chrome keeps running the old copy otherwise.
 
-Prefer not to build? Recent [releases](https://github.com/g7xu/leetlens/releases) attach a ready-to-load `leetlens-<version>.zip` — download, unzip, and load that folder instead. (Releases before v1.1.0 predate the build and have no zip.)
+Prefer not to build? Every [release](https://github.com/g7xu/leetlens/releases) attaches a ready-to-load `leetlens-<version>.zip` — download, unzip, and load that folder instead.
 
 ### 2. Create (or pick) your data repo
 
@@ -144,6 +144,14 @@ python3 -m http.server -d /path/to/your-data-repo 8000
 ```
 
 Contributions welcome: [CONTRIBUTING.md](CONTRIBUTING.md) has the workflow and the sharp edges.
+
+## Privacy
+
+LeetLens has no server and collects nothing. Sessions and solutions go from your browser to the GitHub repository you nominate, using your own credential; that credential and your in-progress session are stored in your browser profile's extension storage. The only hosts contacted are `leetcode.com` (the problem you are solving), `api.github.com` (your repo), and `github.com/login` (signing in).
+
+The hosted analysis server reads your data repo the same way anyone can — it is public — and stores nothing.
+
+**A public data repo is public.** Your sessions, your solutions, and anything you write in the thinking area are visible to anyone. A private repo keeps them to you but loses the dashboard and the hosted server; the MCP server still works locally against a clone.
 
 ## License
 

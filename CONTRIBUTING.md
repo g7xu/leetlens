@@ -70,12 +70,10 @@ The zip is named from the manifest version, so `leetlens-0.2.0.zip` can legitima
 **Cutting a release.** Bump `extension/manifest.json` if the extension itself changed, then from an up-to-date `main`:
 
 ```bash
-npm run zip                                     # → leetlens-<manifest version>.zip
-git tag vX.Y.Z && git push origin vX.Y.Z
-gh release create vX.Y.Z leetlens-*.zip --title "..." --notes "..."
-git tag -f v1 vX.Y.Z && git push -f origin v1   # compatible changes only
+git tag vX.Y.Z && git push origin vX.Y.Z        # release.yml builds and attaches the zip
+git tag -f v2 vX.Y.Z && git push -f origin v2   # compatible changes only
 ```
 
-The zip is how people install the extension, so **a release without it leaves users with no way to get it** — that is exactly what happened with v1.0.0. Whether to move `v1` or cut a new major tag is the policy in ARCHITECTURE.md.
+`.github/workflows/release.yml` builds the zip and attaches it, creating the release if you have not drafted one. That automation exists because a release without the zip leaves users with no way to install the extension, which is what happened with v1.0.0. Whether to move the major tag or cut a new one is the policy in ARCHITECTURE.md.
 
 **Pages deploys.** Retry a failed deploy with a fresh `workflow_dispatch` run — never `gh run rerun`, which duplicates the `github-pages` artifact and the deploy step rejects it.

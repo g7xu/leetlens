@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "LeetLens",
-  "description": "Track how you solve LeetCode: phase timing, run counts, notes and tags, committed to GitHub.",
-  "version": "0.2.0",
+  "description": "Track how you solve LeetCode: thinking vs debugging time, run counts, notes and tags, committed to your own GitHub repo.",
+  "version": "1.0.0",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -51,5 +51,6 @@
       "run_at": "document_idle"
     }
   ],
-  "options_page": "options.html"
+  "options_page": "options.html",
+  "minimum_chrome_version": "120"
 }
