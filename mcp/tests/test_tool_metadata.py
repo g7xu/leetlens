@@ -1,16 +1,18 @@
 """Every tool must be fully described and its output must validate.
 
 A tool with an undocumented parameter or no output schema is a regression in
-what the model can see, even when the tool itself still works.
+what the model can see, even when the tool itself still works. Everything
+goes through an in-process Client so it is the wire view that is checked.
 """
 
 import asyncio
 
 import pytest
+from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
 from leetlens_mcp import server
 from leetlens_mcp.server import mcp
-from mcp.server.mcpserver.exceptions import ToolError
 
 # Arguments that exercise every tool against the fixture records; tools
 # absent here are called with no arguments.
@@ -26,7 +28,19 @@ SAMPLE_ARGS = {
 
 
 def tools():
-    return asyncio.run(mcp.list_tools())
+    async def go():
+        async with Client(mcp) as client:
+            return await client.list_tools()
+
+    return asyncio.run(go())
+
+
+def call(name, args, **kwargs):
+    async def go():
+        async with Client(mcp) as client:
+            return await client.call_tool(name, args, **kwargs)
+
+    return asyncio.run(go())
 
 
 def test_every_tool_is_read_only_and_titled():
@@ -60,21 +74,29 @@ def served(records, monkeypatch):
 def test_every_tool_output_validates(served):
     for t in tools():
         for args in SAMPLE_ARGS.get(t.name, [{}]):
-            result = asyncio.run(mcp.call_tool(t.name, args))
+            result = call(t.name, args)
             assert not result.is_error, (t.name, args)
             assert result.structured_content is not None, (t.name, args)
 
 
 def test_missing_problem_is_a_tool_error(served):
-    with pytest.raises(ToolError):
-        asyncio.run(mcp.call_tool("get_problem_details", {"slug_or_id": "nope"}))
-    with pytest.raises(ToolError):
-        asyncio.run(mcp.call_tool("fetch", {"id": "tag:nope"}))
-    with pytest.raises(ToolError):
-        asyncio.run(mcp.call_tool("compare_periods", {"period_a": "yesterday"}))
+    with pytest.raises(ToolError, match="no sessions found"):
+        call("get_problem_details", {"slug_or_id": "nope"})
+    with pytest.raises(ToolError, match="no sessions carry tag"):
+        call("fetch", {"id": "tag:nope"})
+    with pytest.raises(ToolError, match="unknown period"):
+        call("compare_periods", {"period_a": "yesterday"})
+    assert call("fetch", {"id": "nope"}, raise_on_error=False).is_error
 
 
-def test_compare_periods_keeps_the_from_key(served):
-    result = asyncio.run(mcp.call_tool("compare_periods", {"period_a": "2026-08", "period_b": "2026-09"}))
-    assert result.structured_content["period_a"]["from"] == "2026-08-01"
+def test_compare_periods_reports_its_bounds(served):
+    result = call("compare_periods", {"period_a": "2026-08", "period_b": "2026-09"})
+    assert result.structured_content["period_a"]["date_from"] == "2026-08-01"
+    assert result.structured_content["period_a"]["date_to"] == "2026-08-31"
     assert result.structured_content["period_b"]["session_count"] == 1
+
+
+def test_output_drift_fails_instead_of_advertising_stale_fields(served, monkeypatch):
+    monkeypatch.setattr(server.stats, "revenge_list", lambda records: [{"dir_key": "only-this"}])
+    with pytest.raises(ToolError, match="does not match its output schema"):
+        call("get_revenge_list", {})

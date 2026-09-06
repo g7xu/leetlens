@@ -7,31 +7,60 @@ annotations say so, so clients need not confirm each call.
 from __future__ import annotations
 
 import argparse
-import inspect
+import functools
 import json
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_type_hints
 
-from mcp.server.mcpserver import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import ToolAnnotations
-from pydantic import Field
+from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
+from pydantic import Field, TypeAdapter, ValidationError
 
 from . import documents, models, stats
 from .store import DataStore
 
-mcp = MCPServer("LeetLens")
+mcp = FastMCP(
+    "LeetLens",
+    instructions=(
+        "Practice-session records from one user's LeetCode data repo: per attempt, "
+        "the time split into thinking / writing / reviewing / debugging, run and "
+        "submit counts, outcome, the user's own logic idea and comments, and tags. "
+        "Start a diagnosis with get_weak_areas or recommend_next; use search and "
+        "fetch to read up on one problem; use export_sessions for raw records."
+    ),
+)
 store = DataStore()
 
-READ_ONLY = ToolAnnotations(
-    read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
-)
+READ_ONLY = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": False,
+}
 
 
 def tool(title: str):
-    """Register a read-only tool whose description is its dedented docstring."""
+    """Register a read-only tool and hand back the plain callable.
+
+    The return annotation becomes the advertised output schema, but FastMCP
+    serialises a returned dict without checking it against that schema, so the
+    value is validated here first: a tool whose output drifts from its model
+    fails loudly instead of advertising fields it no longer sends.
+    """
 
     def decorate(fn):
-        return mcp.tool(title=title, description=inspect.cleandoc(fn.__doc__), annotations=READ_ONLY)(fn)
+        adapter = TypeAdapter(get_type_hints(fn)["return"])
+
+        @functools.wraps(fn)
+        def validated(*args, **kwargs):
+            result = fn(*args, **kwargs)
+            try:
+                return adapter.validate_python(result)
+            except ValidationError as err:
+                # Left to FastMCP, a ValidationError is reported as bad *input*.
+                raise ToolError(f"{fn.__name__} returned data that does not match its output schema: {err}") from err
+
+        mcp.tool(title=title, annotations=READ_ONLY)(validated)
+        return validated
 
     return decorate
 
@@ -343,13 +372,16 @@ def sessions_resource(dir_key: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="LeetLens MCP server")
-    parser.add_argument("--transport", default="stdio", choices=["stdio", "streamable-http"])
+    parser.add_argument(
+        "--transport", default="stdio", choices=["stdio", "http", "streamable-http"],
+        help="streamable-http is an alias of http",
+    )
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
-    if args.transport == "streamable-http":
-        mcp.run(transport="streamable-http", host="127.0.0.1", port=args.port)
+    if args.transport == "stdio":
+        mcp.run(transport="stdio", show_banner=False)
     else:
-        mcp.run(transport="stdio")
+        mcp.run(transport="http", host="127.0.0.1", port=args.port, show_banner=False)
 
 
 if __name__ == "__main__":

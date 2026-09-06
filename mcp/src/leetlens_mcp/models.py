@@ -154,11 +154,9 @@ class NoteHit(SessionSummary):
 
 
 class PeriodStats(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
     spec: str = Field(description="The period as requested, e.g. 'this_month' or '2026-08'")
-    from_: str = Field(alias="from", description="First day, YYYY-MM-DD, inclusive")
-    to: str = Field(description="Last day, YYYY-MM-DD, inclusive")
+    date_from: str = Field(description="First day, YYYY-MM-DD, inclusive")
+    date_to: str = Field(description="Last day, YYYY-MM-DD, inclusive")
     session_count: int
     problem_count: int | None = None
     accepted: int | None = None
