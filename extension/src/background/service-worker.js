@@ -2,7 +2,7 @@
 // GitHub. Failed commits are queued in storage and retried on startup.
 
 import { getFileRaw, putFile, testConnection } from '../lib/github.js';
-import { LANG_EXT } from '../lib/languages.js';
+import { attemptPath, codePath, sessionPath } from '../lib/paths.js';
 import { setupRepo } from '../lib/repo-setup.js';
 
 // Tag vocabulary from the repo's data/index.json, so suggestions work on a
@@ -25,27 +25,23 @@ async function getRepoTags() {
   }
 }
 
-function sessionPath(record) {
-  const stamp = record.started_at.replace(/[:]/g, '-').replace(/\.\d+/, '');
-  return `data/sessions/${record.problem.dir_key}/${stamp}_${record.session_id}.json`;
-}
-
 function commitMessage(record) {
   const mins = Math.round(record.total_active_sec / 60);
   return `session: ${record.problem.dir_key} (${record.outcome}, ${mins}m)`;
-}
-
-function codePath(record, lang) {
-  const ext = LANG_EXT[lang] ?? 'txt';
-  return `${record.problem.dir_key}/${record.problem.dir_key}.${ext}`;
 }
 
 async function commitRecord(record) {
   return putFile(sessionPath(record), JSON.stringify(record, null, 2) + '\n', commitMessage(record));
 }
 
+// Committed twice: the per-attempt copy is what lets anyone diff the attempt
+// that failed against the one that worked, which overwriting a single file
+// destroys; the canonical path keeps LeetHub-compatible tooling working.
 async function commitCode(record, code) {
   const content = code.content.endsWith('\n') ? code.content : code.content + '\n';
+  await putFile(record.solution.path, content,
+    `solution: ${record.problem.dir_key} attempt ${record.session_id} (${code.lang})`,
+    { overwrite: true });
   return putFile(codePath(record, code.lang), content,
     `solution: ${record.problem.dir_key} (${code.lang})`, { overwrite: true });
 }
@@ -53,10 +49,17 @@ async function commitCode(record, code) {
 /**
  * Commit a queue entry: session JSON first, then the solution code if captured.
  * `sessionSaved` makes retries idempotent — a retry after a code-only failure
- * must not commit the session file twice.
+ * must not commit the session file twice. The solution reference is resolved
+ * before the session is written, so the record names the file that follows it.
  */
 async function commitEntry(entry) {
   if (!entry.sessionSaved) {
+    if (entry.code) {
+      entry.record.solution = {
+        path: attemptPath(entry.record, entry.code.lang),
+        language: entry.code.lang,
+      };
+    }
     await commitRecord(entry.record);
     entry.sessionSaved = true;
   }

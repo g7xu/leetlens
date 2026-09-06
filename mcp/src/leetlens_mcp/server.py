@@ -163,6 +163,20 @@ def list_sessions(
     return rows[offset : offset + limit]
 
 
+def _attempt_sources(records: list[dict]) -> dict[str, str]:
+    """Each attempt's own committed code, keyed by session_id; skips ones with none."""
+    store_ = current_store()
+    out = {}
+    for rec in records:
+        path = (rec.get("solution") or {}).get("path")
+        if not path:
+            continue
+        source = store_.load_solution(rec["problem"]["dir_key"], path=path)
+        if source is not None:
+            out[rec["session_id"]] = source
+    return out
+
+
 def _problem_sessions(slug_or_id: str) -> list[dict]:
     """That problem's sessions, oldest first; matches slug, dir_key, or frontend id."""
     matches = [
@@ -178,9 +192,11 @@ def _problem_sessions(slug_or_id: str) -> list[dict]:
 @tool("Problem details")
 def get_problem_details(slug_or_id: ProblemId) -> models.ProblemDetails:
     """Everything recorded about one problem: every attempt in full (phases,
-    run counts, logic idea, comments, tags) plus the committed solution source.
+    run counts, logic idea, comments, tags), the newest committed solution,
+    and each attempt's own code under attempt_sources.
 
-    Use this to explain why a specific problem went well or badly. fetch
+    Use this to explain why a specific problem went well or badly, including
+    what changed between a failed attempt and the one that worked. fetch
     returns the same material rendered as one readable document.
     """
     matches = _problem_sessions(slug_or_id)
@@ -188,6 +204,7 @@ def get_problem_details(slug_or_id: ProblemId) -> models.ProblemDetails:
         "problem": matches[0]["problem"],
         "sessions": matches,
         "solution_source": current_store().load_solution(matches[0]["problem"]["dir_key"]),
+        "attempt_sources": _attempt_sources(matches),
     }
 
 
@@ -215,8 +232,8 @@ def fetch(
     ],
 ) -> models.Document:
     """One self-contained document. For a problem: every attempt with phase
-    split, debugging share, runs, notes, then the committed solution. For a
-    tag: its aggregate stats and every session carrying it.
+    split, debugging share, runs, notes, and the code as it stood at the end of
+    that attempt. For a tag: its aggregate stats and every session carrying it.
 
     Use this after search, or whenever a readable write-up of one problem is
     more useful than the raw records from get_problem_details.
@@ -227,7 +244,11 @@ def fetch(
             raise ToolError(f"no sessions carry tag {id!r}; list_tags shows the vocabulary")
         return doc
     matches = _problem_sessions(id)
-    return documents.problem_document(matches, current_store().load_solution(matches[0]["problem"]["dir_key"]))
+    return documents.problem_document(
+        matches,
+        current_store().load_solution(matches[0]["problem"]["dir_key"]),
+        _attempt_sources(matches),
+    )
 
 
 @tool("Grouped stats")

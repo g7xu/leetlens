@@ -56,7 +56,7 @@ Write as much as you like in the thinking area: it's a block comment, so it neve
 
 Your data repo's workflow pins the LeetLens toolchain with `LEETLENS_REF: v2`, a moving major tag; pin an exact release tag instead if you prefer reproducibility. The tag policy is in [ARCHITECTURE.md](ARCHITECTURE.md#the-two-repo-model).
 
-> **Upgrading from `v1`.** Sessions now record LeetCode's own topic tags, so weak-area analysis works even if you never tag anything yourself. Change `LEETLENS_REF: v1` to `v2` in your data repo's `.github/workflows/publish.yml` and push; old sessions keep working, they just have no topics. Staying on `v1` is fine — v1 ignores the new field.
+> **Upgrading from `v1`.** Sessions now record LeetCode's own topic tags (so weak-area analysis works even if you never tag anything yourself) and keep a copy of the code from every attempt, not just the last one. Change `LEETLENS_REF: v1` to `v2` in your data repo's `.github/workflows/publish.yml` and push; old sessions keep working, they just have no topics. Staying on `v1` is fine — v1 ignores the new fields.
 
 ### 5. MCP server (Claude Code / Claude Desktop / ChatGPT)
 

@@ -107,11 +107,18 @@ def _session_lines(rec: dict, heading: str) -> list[str]:
     return lines
 
 
-def problem_document(records: list[dict], solution_source: str | None) -> dict:
+def problem_document(
+    records: list[dict],
+    solution_source: str | None,
+    attempt_sources: dict[str, str] | None = None,
+) -> dict:
     """One problem as a document: every attempt in order, then the committed solution.
 
     `records` are that problem's sessions, oldest first (the store's order).
+    `attempt_sources` maps session_id to that attempt's own code, so a reader
+    can see what changed between a failed attempt and the one that worked.
     """
+    attempt_sources = attempt_sources or {}
     prob = records[0]["problem"]
     accepted = sum(r["outcome"] == "accepted" for r in records)
     gave_up = sum(r["outcome"] == "gave_up" for r in records)
@@ -125,7 +132,11 @@ def problem_document(records: list[dict], solution_source: str | None) -> dict:
     for rec in records:
         lines.append("")
         lines.extend(_session_lines(rec, f"Attempt {rec.get('attempt_number', 1)}"))
-    if solution_source:
+        source = attempt_sources.get(rec["session_id"])
+        if source:
+            language = rec.get("solution", {}).get("language", "")
+            lines += [f"```{language}", source.rstrip("\n"), "```"]
+    if solution_source and not attempt_sources:
         language = records[-1].get("language", "")
         lines += ["", f"## Solution ({language})" if language else "## Solution",
                   f"```{language}", solution_source.rstrip("\n"), "```"]
@@ -145,6 +156,7 @@ def problem_document(records: list[dict], solution_source: str | None) -> dict:
             "topics": prob.get("topics", []),
             "last_session_at": records[-1]["started_at"],
             "has_solution": solution_source is not None,
+            "attempts_with_code": sorted(attempt_sources),
         },
     }
 

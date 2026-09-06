@@ -98,16 +98,29 @@ class DataStore:
         """All session records, sorted by started_at, with attempt_number added."""
         return self._cached("sessions", self._load_sessions)
 
-    def load_solution(self, dir_key: str) -> str | None:
-        """Solution source for a problem (LeetHub layout: <dir_key>/<dir_key>.py)."""
+    def load_solution(self, dir_key: str, path: str | None = None) -> str | None:
+        """Solution source: one attempt's own file when `path` is given, else the newest.
+
+        Without `path` this is the canonical <dir_key>/<dir_key>.<ext>, which
+        the extension overwrites on every attempt; the per-attempt copies live
+        under <dir_key>/attempts/ and are named by each session's `solution`.
+        """
+        if path is not None:
+            return self._cached(f"file:{path}", lambda: self._fetch_or_read(path))
         if self.mode == "github":
             return self._cached(f"solution:{dir_key}", lambda: self._fetch_solution(dir_key))
         folder = self.root / dir_key
         if folder.is_dir():
             for f in sorted(folder.iterdir()):
-                if f.suffix.lstrip(".") in SOLUTION_SUFFIXES:
+                if f.is_file() and f.suffix.lstrip(".") in SOLUTION_SUFFIXES:
                     return f.read_text()
         return None
+
+    def _fetch_or_read(self, path: str) -> str | None:
+        if self.mode == "github":
+            return self._fetch_raw(path)
+        local = self.root / path
+        return local.read_text() if local.is_file() else None
 
     def _fetch_solution(self, dir_key: str) -> str | None:
         for ext in SOLUTION_SUFFIXES:

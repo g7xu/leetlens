@@ -101,6 +101,28 @@ def test_local_store_reads_sessions_and_solutions(data_repo, records):
     assert store.load_solution("0001-two-sum") is None
 
 
+def test_the_attempts_folder_does_not_hide_the_canonical_solution(data_repo):
+    attempts = data_repo / "0322-coin-change" / "attempts"
+    attempts.mkdir()
+    (attempts / "2026-08-15T10-00-00Z_aaaaaaa4.py").write_text("first try\n")
+    store = DataStore(data_repo)
+    # "attempts" sorts before the canonical file, but it is a directory.
+    assert store.load_solution("0322-coin-change") == "def coinChange(): ...\n"
+    assert store.load_solution(
+        "0322-coin-change", path="0322-coin-change/attempts/2026-08-15T10-00-00Z_aaaaaaa4.py"
+    ) == "first try\n"
+    assert store.load_solution("0322-coin-change", path="0322-coin-change/attempts/nope.py") is None
+
+
+def test_remote_store_reads_one_attempt_by_path(remote):
+    gh, _ = remote
+    gh.files["0322-coin-change/attempts/x.py"] = "first try\n"
+    store = make_store(gh, allow_tree_walk=False)
+    assert store.load_solution("0322-coin-change", path="0322-coin-change/attempts/x.py") == "first try\n"
+    store.load_solution("0322-coin-change", path="0322-coin-change/attempts/x.py")
+    assert len(gh.requests) == 1, "a re-read comes from the cache"
+
+
 def test_repo_root_defaults_to_cwd(monkeypatch, tmp_path):
     monkeypatch.delenv("LCP_REPO_PATH", raising=False)
     monkeypatch.chdir(tmp_path)

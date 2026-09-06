@@ -49,6 +49,7 @@ The split below is not a style choice — **Chrome's extension worlds force it**
 | `src/lib/leetcode-endpoints.js` | both | Every LeetCode URL, selector and API shape; the only file to touch when LeetCode changes |
 | `src/lib/thinking-area.js`, `src/lib/languages.js`, `src/lib/messages.js` | both | The thinking-block format (write and parse sides), the language-slug tables, and the `postMessage` source tags — one definition each, inlined into both worlds by the bundler |
 | `src/lib/github.js`, `src/lib/repo-setup.js` | worker | GitHub Contents API client; one-click data-repo setup |
+| `src/lib/paths.js` | worker | Where session, solution and per-attempt files land — a contract the indexer and MCP server read back |
 | `src/background/service-worker.js` | worker | Commits sessions + solutions; queues and retries failures across restarts |
 
 ## Message flows
@@ -98,6 +99,6 @@ extension ──commit──▶ data repo ──workflow──▶ data/index.jso
 
 - `data/index.json` is **generated, never authored**, and it is the only generated file the copied workflow commits and deploys — so it also carries every full session record (`records`) for remote readers. When a concurrent run wins the push race, the workflow re-runs the indexer on top of what landed (`fetch` + `reset --hard`) — never `git pull --rebase`, which conflicts with itself on a generated file.
 - The MCP server (`mcp/`, FastMCP) reads sessions through one `DataStore`: a local clone, or GitHub in one request via `index.json`. The hosted entrypoint mounts the same server under `/{owner}/{repo}/mcp` and resolves a store per request, so one deployment serves any public data repo.
-- The extension pushes **two commits per save** (session, then solution), so data-repo CI must tolerate `main` moving mid-run.
+- The extension pushes **two commits per save** (session, then solution), so data-repo CI must tolerate `main` moving mid-run. A solution is written twice within that second commit: `<dir_key>/<dir_key>.<ext>` always holds the newest attempt (LeetHub layout), and `<dir_key>/attempts/<stamp>_<id>.<ext>` preserves the one this session produced, which is what makes "what changed between the attempt that failed and the one that worked" answerable.
 - `data/schema/session.schema.json` is the contract every component builds against, with `additionalProperties: false` throughout — new fields require a schema change, which is a **breaking** change per the tag policy above.
 - Sessions carry **two** vocabularies: `tags` are the user's own and may be absent entirely, while `problem.topics` are LeetCode's and are recorded for every problem. Anything that ranks weaknesses takes a `kind` and defaults to whichever the user actually has, so the tool works for someone who never tags (`stats.by_label`, `rankingKind` in the dashboard).

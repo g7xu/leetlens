@@ -68,8 +68,22 @@ def test_problem_document(records):
         "topics": ["array", "dynamic-programming", "breadth-first-search"],
         "last_session_at": "2026-08-20T10:00:00Z",
         "has_solution": True,
+        "attempts_with_code": [],
     }
     assert "LeetCode topics: array, dynamic-programming" in text
+
+
+def test_problem_document_shows_each_attempt_s_own_code(records):
+    coin = [r for r in records if r["problem"]["dir_key"] == "0322-coin-change"]
+    sources = {coin[0]["session_id"]: "greedy = True", coin[1]["session_id"]: "dp = [0] * n"}
+    doc = documents.problem_document(coin, "newest", sources)
+    text = doc["text"]
+    # Each attempt's code sits under that attempt, in order, so the two can be compared.
+    assert text.index("greedy = True") < text.index("dp = [0] * n")
+    assert text.index("Attempt 1") < text.index("greedy = True") < text.index("Attempt 2")
+    # The canonical copy is redundant once every attempt is shown.
+    assert "newest" not in text
+    assert doc["metadata"]["attempts_with_code"] == sorted(sources)
 
 
 def test_problem_document_without_solution(records):
