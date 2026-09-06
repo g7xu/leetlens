@@ -16,6 +16,7 @@ from typing import Annotated, Literal, get_type_hints
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import get_http_request
+import httpx
 from pydantic import Field, TypeAdapter, ValidationError
 
 from . import documents, models, stats
@@ -37,7 +38,7 @@ store = DataStore()
 # URL (/{owner}/{repo}/mcp), so each request resolves its own store. Bounded
 # so a scan of random owner/repo pairs cannot grow the process without limit.
 REMOTE_STORE_LIMIT = 64
-REPO_SEGMENT = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
+REPO_SEGMENT = re.compile(r"^(?!\.\.?$)[A-Za-z0-9_.-]{1,100}$")
 _remote_stores: OrderedDict[str, DataStore] = OrderedDict()
 
 
@@ -63,15 +64,17 @@ def current_store() -> DataStore:
     remote = make_remote_store(owner, repo)
     _remote_stores[key] = remote
     while len(_remote_stores) > REMOTE_STORE_LIMIT:
-        _remote_stores.popitem(last=False)
+        _, evicted = _remote_stores.popitem(last=False)
+        evicted.close()
     return remote
 
 
 def load_sessions() -> list[dict]:
+    """Sessions for this call, with data-source failures named for the user."""
     try:
         return current_store().load_sessions()
-    except RuntimeError as err:
-        raise ToolError(str(err)) from err
+    except (RuntimeError, httpx.HTTPError, ValueError) as err:
+        raise ToolError(f"could not read the data repo: {err}") from err
 
 
 READ_ONLY = {
@@ -404,7 +407,10 @@ def weekly_review() -> str:
 @mcp.resource("leetlens://index", mime_type="application/json")
 def index_resource() -> str:
     """The aggregate index (totals, per-problem summaries, sessions, tags, daily activity)."""
-    return current_store().load_index_raw()
+    raw = current_store().load_index_raw()
+    if raw is None:
+        raise ToolError("this data repo has no data/index.json — set it up and push once")
+    return raw
 
 
 @mcp.resource("leetlens://sessions/{dir_key}", mime_type="application/json")

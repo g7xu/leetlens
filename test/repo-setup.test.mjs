@@ -39,3 +39,13 @@ test('AGENTS.md tells an agent where the data is and what it means', () => {
 test('CLAUDE.md is exactly an import of AGENTS.md', () => {
   assert.equal(CLAUDE_MD, '@AGENTS.md\n');
 });
+
+test('setup replaces only AGENTS.md; CLAUDE.md and .mcp.json are merged into', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../extension/src/lib/repo-setup.js', import.meta.url), 'utf8');
+  const setupBody = src.slice(src.indexOf('export async function setupRepo'));
+  assert.match(setupBody, /putFile\('AGENTS\.md', AGENTS_MD,\s*'[^']*', \{ overwrite: true \}\)/);
+  assert.doesNotMatch(setupBody, /putFile\('CLAUDE\.md'/);
+  assert.doesNotMatch(setupBody, /putFile\('\.mcp\.json'/);
+  assert.match(setupBody, /await ensureClaudeImport\(\);\s*await mergeMcpServer\(\);/);
+});

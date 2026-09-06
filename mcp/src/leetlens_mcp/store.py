@@ -20,12 +20,18 @@ import json
 import logging
 import os
 import time
+from http import HTTPStatus
 from pathlib import Path
 
 import httpx
 
 CACHE_TTL_SEC = 300
-SOLUTION_SUFFIXES = ("py", "java", "cpp", "js", "ts", "go")
+# Mirrors LANG_EXT in extension/src/lib/languages.js: every extension the
+# extension can commit a solution under.
+SOLUTION_SUFFIXES = (
+    "py", "cpp", "c", "java", "js", "ts", "go", "rs", "cs", "kt", "swift",
+    "rb", "scala", "php", "dart", "rkt", "erl", "ex", "sh", "sql", "txt",
+)
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +73,11 @@ class DataStore:
             self._client = httpx.Client(timeout=30)
         return self._client
 
+    def close(self) -> None:
+        if self._client is not None:
+            self._client.close()
+            self._client = None
+
     def _api_headers(self) -> dict[str, str]:
         headers = {"X-GitHub-Api-Version": "2022-11-28"}
         if self.token:
@@ -90,11 +101,7 @@ class DataStore:
     def load_solution(self, dir_key: str) -> str | None:
         """Solution source for a problem (LeetHub layout: <dir_key>/<dir_key>.py)."""
         if self.mode == "github":
-            for ext in SOLUTION_SUFFIXES:
-                text = self._fetch_raw(f"{dir_key}/{dir_key}.{ext}")
-                if text is not None:
-                    return text
-            return None
+            return self._cached(f"solution:{dir_key}", lambda: self._fetch_solution(dir_key))
         folder = self.root / dir_key
         if folder.is_dir():
             for f in sorted(folder.iterdir()):
@@ -102,12 +109,19 @@ class DataStore:
                     return f.read_text()
         return None
 
-    def load_index_raw(self) -> str:
-        """The raw data/index.json text (for the MCP resource); "{}" when absent."""
+    def _fetch_solution(self, dir_key: str) -> str | None:
+        for ext in SOLUTION_SUFFIXES:
+            text = self._fetch_raw(f"{dir_key}/{dir_key}.{ext}")
+            if text is not None:
+                return text
+        return None
+
+    def load_index_raw(self) -> str | None:
+        """The data/index.json text, or None when the repo has none."""
         if self.mode == "github":
-            return self._cached("index_raw", lambda: self._fetch_raw("data/index.json")) or "{}"
+            return self._cached("index_raw", lambda: self._fetch_raw("data/index.json"))
         path = self.root / "data" / "index.json"
-        return path.read_text() if path.exists() else "{}"
+        return path.read_text() if path.exists() else None
 
     # -- loading -------------------------------------------------------
     def _load_sessions(self) -> list[dict]:
@@ -134,14 +148,22 @@ class DataStore:
 
     def _load_sessions_github(self) -> list[dict]:
         index_text = self.load_index_raw()
-        records = json.loads(index_text).get("records")
+        if index_text is None:
+            raise RuntimeError(
+                f"{self.repo} has no data/index.json on {self.branch} — check the "
+                "owner/repo spelling, that the repo is public, and that 'Set up "
+                "repo' has run and its workflow has pushed once"
+            )
+        try:
+            records = json.loads(index_text).get("records")
+        except json.JSONDecodeError as err:
+            raise RuntimeError(f"{self.repo}: data/index.json is not valid JSON ({err})") from err
         if records is not None:
             return records
         if not self.allow_tree_walk:
             raise RuntimeError(
-                f"{self.repo} has no data/index.json with session records — run "
-                "'Set up repo' in the extension, push once, and make sure the "
-                "workflow's LEETLENS_REF is v1 or later"
+                f"{self.repo}: data/index.json predates session records — push once "
+                "so its workflow regenerates the index on the current toolchain"
             )
         log.warning(
             "%s: index.json has no records (built by an older toolchain); "
@@ -167,7 +189,9 @@ class DataStore:
         """File contents at `path` on the configured branch, or None if absent.
 
         With a token, goes through the Contents API (works for private repos);
-        without one, raw.githubusercontent.com (public repos only).
+        without one, raw.githubusercontent.com (public repos only). Only a 404
+        means absent: a rate limit or a 5xx raises, so it is never mistaken for
+        an empty repo and never cached as one.
         """
         if self.token:
             resp = self.client.get(
@@ -179,4 +203,7 @@ class DataStore:
             resp = self.client.get(
                 f"https://raw.githubusercontent.com/{self.repo}/{self.branch}/{path}"
             )
-        return resp.text if resp.status_code == 200 else None
+        if resp.status_code == HTTPStatus.NOT_FOUND:
+            return None
+        resp.raise_for_status()
+        return resp.text

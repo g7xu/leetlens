@@ -15,6 +15,10 @@ Then `chrome://extensions` → Developer mode → **Load unpacked** → the gene
 
 You'll need a data repo to commit into — any scratch public repo works. Follow the README's token steps (Contents + Workflows, both Read and write).
 
+```bash
+uv run --directory mcp --group dev pytest -q     # MCP server tests
+```
+
 ## Tests
 
 ```bash
@@ -23,7 +27,7 @@ npm test          # or: node --test 'test/*.test.mjs'
 
 The quotes matter — a bare `test/` is resolved as a module path and fails.
 
-Tests import from `extension/src` directly, never from `dist/`, so they run without a build. The thinking-area tests pin the contract between the block that `main-world.js` writes and what `extractThinkingArea` parses back — those two files each still carry a copy of `THINK_HEADER_RE`, so **any change to the block format must update both files and the test fixtures together**.
+Tests import from `extension/src` directly, never from `dist/`, so they run without a build. The thinking-area tests pin the block format both worlds share through `src/lib/thinking-area.js`; the session-machine tests pin every number the dashboard reports; the repo-setup tests evaluate the files "Set up repo" writes into a user's repo.
 
 CI runs the Node and Python tests on every PR, builds, checks that no `import`/`export` survived into the two classic content scripts and that every path in `manifest.json` resolves, and YAML-parses the data-repo workflow that `repo-setup.js` exports as a template string.
 

@@ -31,7 +31,7 @@ Prefer not to build? Recent [releases](https://github.com/g7xu/leetlens/releases
 
 Any repo works: create an empty one (e.g. `leetcode-journal`), or reuse an existing LeetHub repo — LeetLens writes sessions to `data/sessions/` and solutions to the same `<id>-<slug>/` folders LeetHub uses.
 
-> GitHub Pages requires a public repo on free plans.
+> GitHub Pages requires a public repo on free plans. A public data repo makes everything in it public: your sessions, your solutions, and whatever you write in the thinking area. A private repo works too, but loses the dashboard and the hosted MCP server.
 
 ### 3. Create a fine-grained personal access token
 

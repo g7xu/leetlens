@@ -1,15 +1,15 @@
-// Contract between the block main-world.js writes and the block
-// leetcode-endpoints.js peels back off. The two live in different worlds and
-// cannot share constants, so the shapes below are the only thing keeping them
-// honest — the strings marked "injector output" must be copied verbatim from
-// thinkingBlock() in main-world.js whenever it changes.
-//
-// Run: node --test
+// Contract between the block the injector writes and the block the content
+// script peels back off. Both come from src/lib/thinking-area.js; the literal
+// strings below pin the on-disk shape so a change to the writer is a visible
+// change to the tests, not a silent drift.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { extractThinkingArea } from '../extension/src/lib/leetcode-endpoints.js';
+import { LANG_EXT, NO_BLOCK_COMMENT, blockDelimiters } from '../extension/src/lib/languages.js';
+import {
+  THINK_HEADER_RE, extractThinkingArea, lineInThinkingArea, thinkingBlock,
+} from '../extension/src/lib/thinking-area.js';
 
 const PY_CODE = 'class Solution:\n    def twoSum(self, nums, target):\n        return []';
 const CPP_CODE = 'class Solution {\npublic:\n    int f() { return 0; }\n};';
@@ -44,23 +44,37 @@ test('a python note keeps its own # prefix', () => {
   assert.equal(notes, '# TODO handle dupes');
 });
 
-test('every language family the injector writes round-trips', () => {
-  // Mirrors blockDelimiters() in main-world.js — update both together.
-  const families = [
-    ['python3', 'r"""', '"""'],
-    ['pythondata', 'r"""', '"""'],
-    ['cpp', '/*', '*/'],
-    ['golang', '/*', '*/'],
-    ['oraclesql', '/*', '*/'],
-    ['ruby', '=begin', '=end'],
-    ['racket', '#|', '|#'],
-  ];
-  for (const [lang, open, close] of families) {
+test('every language the injector writes for round-trips through the parser', () => {
+  for (const lang of Object.keys(LANG_EXT)) {
+    const block = thinkingBlock(lang);
+    if (!block) {
+      assert.ok(NO_BLOCK_COMMENT.includes(lang), `${lang}: no block only for languages without block comments`);
+      continue;
+    }
+    assert.match(block, THINK_HEADER_RE, `${lang}: header must be recognised`);
+    const [open, close] = blockDelimiters(lang);
     const src = `${open} Thinking area\nmy approach\n\n${close}\n\n${PY_CODE}`;
     const { notes, code } = extractThinkingArea(src);
     assert.equal(notes, 'my approach', `${lang}: notes`);
     assert.equal(code, PY_CODE, `${lang}: code`);
+    assert.deepEqual(extractThinkingArea(block + PY_CODE), { notes: '', code: PY_CODE }, `${lang}: fresh block`);
   }
+});
+
+test('the caret check knows the block bounds', () => {
+  const src = `\n/* Thinking area\nnote\n*/\n${CPP_CODE}`;
+  assert.equal(lineInThinkingArea(src, 0, 'cpp'), false, 'blank line above the block');
+  assert.equal(lineInThinkingArea(src, 1, 'cpp'), true, 'header');
+  assert.equal(lineInThinkingArea(src, 2, 'cpp'), true, 'note');
+  assert.equal(lineInThinkingArea(src, 3, 'cpp'), true, 'closer');
+  assert.equal(lineInThinkingArea(src, 4, 'cpp'), false, 'code');
+  assert.equal(lineInThinkingArea(CPP_CODE, 0, 'cpp'), false, 'no block');
+  assert.equal(lineInThinkingArea(src, 2, 'bash'), false, 'language without blocks');
+});
+
+test('a whole editor buffer with a restored block is detected', () => {
+  assert.match(`\n\n${cBlock('x')}`, THINK_HEADER_RE);
+  assert.doesNotMatch(`/**\n * ListNode\n */\n${CPP_CODE}`, THINK_HEADER_RE);
 });
 
 // --- backward compatibility with blocks already committed ---------------

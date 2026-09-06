@@ -4,6 +4,8 @@
 import { SessionMachine } from '../state/session-machine.js';
 import { Panel } from './panel.js';
 import * as endpoints from '../lib/leetcode-endpoints.js';
+import { EVENT_SOURCE, REQUEST_SOURCE } from '../lib/messages.js';
+import { extractThinkingArea } from '../lib/thinking-area.js';
 
 (async () => {
   if (window.__leetlensLoaded) return;
@@ -103,7 +105,7 @@ import * as endpoints from '../lib/leetcode-endpoints.js';
   /** Peel the thinking-area block off captured code: the block text becomes
    *  the logic-idea draft, and the committed solution file stays clean. */
   function captureCodeAndNotes(payload) {
-    const { notes, code } = endpoints.extractThinkingArea(payload.code ?? '');
+    const { notes, code } = extractThinkingArea(payload.code ?? '');
     machine.captureCode(code, payload.lang);
     if (notes) machine.notes = notes;
   }
@@ -130,14 +132,14 @@ import * as endpoints from '../lib/leetcode-endpoints.js';
         resolve(value);
       };
       const onMessage = (event) => {
-        if (event.source !== window || event.data?.source !== 'leetlens') return;
+        if (event.source !== window || event.data?.source !== EVENT_SOURCE) return;
         if (event.data.type !== 'EDITOR_CODE' || event.data.payload?.id !== id) return;
         finish(event.data.payload);
       };
       const timer = setTimeout(() => finish(null), timeoutMs);
       window.addEventListener('message', onMessage);
       window.postMessage(
-        { source: 'leetlens-req', type: 'GET_EDITOR_CODE', id },
+        { source: REQUEST_SOURCE, type: 'GET_EDITOR_CODE', id },
         window.location.origin,
       );
     });
@@ -159,7 +161,7 @@ import * as endpoints from '../lib/leetcode-endpoints.js';
       // teardown() or an orphaned context can null the machine mid-await.
       if (!machine || machine.ended) return;
       if (live?.code != null) {
-        const { notes, code } = endpoints.extractThinkingArea(live.code);
+        const { notes, code } = extractThinkingArea(live.code);
         // The editor is authoritative here, so clearing the notes counts too —
         // unlike the run/submit path, which must not clobber with empty.
         machine.notes = notes;
@@ -296,7 +298,7 @@ import * as endpoints from '../lib/leetcode-endpoints.js';
 
   // -- MAIN-world events -------------------------------------------------
   window.addEventListener('message', (event) => {
-    if (event.source !== window || event.data?.source !== 'leetlens') return;
+    if (event.source !== window || event.data?.source !== EVENT_SOURCE) return;
     if (!contextAlive()) {
       orphanTeardown();
       return;

@@ -71,7 +71,8 @@ $('setup').addEventListener('click', async () => {
 
 $('flush').addEventListener('click', async () => {
   const resp = await chrome.runtime.sendMessage({ type: 'FLUSH_QUEUE' });
-  status(`Retried: ${resp.flushed} committed, ${resp.remaining} still queued.`,
+  status(`Retried: ${resp.flushed} committed, ${resp.remaining} still queued.`
+    + (resp.lastError ? ` Last error: ${resp.lastError}` : ''),
     resp.remaining ? 'err' : 'ok');
   refreshQueueCount();
 });

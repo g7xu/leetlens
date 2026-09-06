@@ -2,6 +2,7 @@
 // GitHub. Failed commits are queued in storage and retried on startup.
 
 import { getFileRaw, putFile, testConnection } from '../lib/github.js';
+import { LANG_EXT } from '../lib/languages.js';
 import { setupRepo } from '../lib/repo-setup.js';
 
 // Tag vocabulary from the repo's data/index.json, so suggestions work on a
@@ -33,16 +34,6 @@ function commitMessage(record) {
   const mins = Math.round(record.total_active_sec / 60);
   return `session: ${record.problem.dir_key} (${record.outcome}, ${mins}m)`;
 }
-
-// LeetCode language slug -> file extension (LeetHub layout: <dir_key>/<dir_key>.<ext>).
-const LANG_EXT = {
-  python: 'py', python3: 'py', pythondata: 'py', cpp: 'cpp', c: 'c', java: 'java',
-  javascript: 'js', typescript: 'ts', golang: 'go', rust: 'rs',
-  csharp: 'cs', kotlin: 'kt', swift: 'swift', ruby: 'rb', scala: 'scala',
-  php: 'php', dart: 'dart', racket: 'rkt', erlang: 'erl', elixir: 'ex',
-  bash: 'sh', shell: 'sh',
-  mysql: 'sql', mssql: 'sql', oraclesql: 'sql', postgresql: 'sql',
-};
 
 function codePath(record, lang) {
   const ext = LANG_EXT[lang] ?? 'txt';
@@ -78,9 +69,14 @@ async function enqueue(entry) {
   await chrome.storage.local.set({ pendingCommits });
 }
 
+/**
+ * Entries that fail again stay queued with their latest error, which the
+ * options page shows: a queue that never drains is otherwise
+ * indistinguishable from one that is merely waiting for a network.
+ */
 async function flushQueue() {
   const { pendingCommits = [] } = await chrome.storage.local.get('pendingCommits');
-  if (!pendingCommits.length) return { flushed: 0, remaining: 0 };
+  if (!pendingCommits.length) return { flushed: 0, remaining: 0, lastError: null };
   const remaining = [];
   let flushed = 0;
   for (const item of pendingCommits) {
@@ -89,12 +85,13 @@ async function flushQueue() {
     try {
       await commitEntry(entry);
       flushed += 1;
-    } catch {
+    } catch (err) {
+      entry.lastError = String(err);
       remaining.push(entry);
     }
   }
   await chrome.storage.local.set({ pendingCommits: remaining });
-  return { flushed, remaining: remaining.length };
+  return { flushed, remaining: remaining.length, lastError: remaining.at(-1)?.lastError ?? null };
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -107,10 +104,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           sendResponse({ ok: true });
         } catch (err) {
           const text = String(err);
-          // Config problems should surface to the user; transient/network
-          // problems get queued for retry.
+          // Config and conflict problems should surface to the user; only
+          // transient/network problems are worth queueing for retry.
           if (text.includes('not configured') || text.includes('GitHub 401') ||
-              text.includes('GitHub 403') || text.includes('GitHub 404')) {
+              text.includes('GitHub 403') || text.includes('GitHub 404') ||
+              text.includes('GitHub 409') || text.includes('GitHub 422')) {
             sendResponse({ ok: false, error: text });
           } else {
             await enqueue(entry);

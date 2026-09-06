@@ -6,10 +6,11 @@ One page on how LeetLens is put together and why. Setup lives in the [README](RE
 
 This repo is **the tool only**. Every user's data — session JSON, solution files, the generated index — lives in a repo *they* own (new, or an existing LeetHub repo; the layouts are compatible).
 
-The extension's **Set up repo** button turns any repo into a data repo by committing two things (source of truth: `extension/src/lib/repo-setup.js`):
+The extension's **Set up repo** button turns any repo into a data repo by committing (source of truth: `extension/src/lib/repo-setup.js`):
 
 - `.github/workflows/publish.yml` — on each push, checks out this tool repo at `.leetlens/`, rebuilds `data/index.json` with the indexer, commits it, and deploys the dashboard + index to GitHub Pages.
 - `data/sessions/.gitkeep` — the folder session records land in.
+- `AGENTS.md` (+ `CLAUDE.md` importing it) and `.mcp.json` — so a coding agent that opens the repo as a folder knows the layout, and Claude Code offers the MCP server on open.
 
 Data repos pin the toolchain with `LEETLENS_REF: v1`, a **moving major tag**:
 
@@ -45,7 +46,8 @@ The split below is not a style choice — **Chrome's extension worlds force it**
 | `src/content/content.js` | isolated | Controller: session lifecycle, bridges MAIN-world events, persistence, hands finished sessions to the service worker |
 | `src/state/session-machine.js` | isolated | Model: phase state machine, pure data — no DOM, no `chrome.*`, snapshot/restorable |
 | `src/content/panel.js` + `panel.css.js` | isolated | View: closed-shadow-DOM panel — live timer and the save form |
-| `src/lib/leetcode-endpoints.js` | isolated | Every LeetCode selector/API shape the isolated world depends on, plus `extractThinkingArea` |
+| `src/lib/leetcode-endpoints.js` | both | Every LeetCode URL, selector and API shape; the only file to touch when LeetCode changes |
+| `src/lib/thinking-area.js`, `src/lib/languages.js`, `src/lib/messages.js` | both | The thinking-block format (write and parse sides), the language-slug tables, and the `postMessage` source tags — one definition each, inlined into both worlds by the bundler |
 | `src/lib/github.js`, `src/lib/repo-setup.js` | worker | GitHub Contents API client; one-click data-repo setup |
 | `src/background/service-worker.js` | worker | Commits sessions + solutions; queues and retries failures across restarts |
 
@@ -82,17 +84,19 @@ The block injected at the top of the editor **must be a block comment** (`r"""�
 
 Two invariants, both pinned by `test/thinking-area.test.mjs`:
 
-- `THINK_HEADER_RE` exists **twice** — in `main-world.js` (can't import) and `leetcode-endpoints.js`. They must recognise the same openers, or a cloud-save-restored block goes undetected and a duplicate is prepended on every reload.
+- `THINK_HEADER_RE` (in `src/lib/thinking-area.js`, shared by the writer in `main-world.js` and the parser) must recognise every opener `thinkingBlock()` can write, or a cloud-save-restored block goes undetected and a duplicate is prepended on every reload.
 - The pattern must **never** match `/**` — LeetCode's own `/** Definition for ListNode … */` template docblock would otherwise be stripped from committed solutions.
 
 ## Data flow
 
 ```
 extension ──commit──▶ data repo ──workflow──▶ data/index.json ──▶ Pages dashboard
-   (session JSON + solution)         │
-                                     └──▶ MCP server (local clone or GitHub fetch)
+   (session JSON + solution)         │                  │
+                                     │                  └──▶ hosted MCP server (mcp/app.py, one URL per repo)
+                                     └──▶ local MCP server (clone, or .mcp.json in the data repo)
 ```
 
-- `data/index.json` is **generated, never authored**. When a concurrent run wins the push race, the workflow re-runs the indexer on top of what landed (`fetch` + `reset --hard`) — never `git pull --rebase`, which conflicts with itself on a generated file.
+- `data/index.json` is **generated, never authored**, and it is the only generated file the copied workflow commits and deploys — so it also carries every full session record (`records`) for remote readers. When a concurrent run wins the push race, the workflow re-runs the indexer on top of what landed (`fetch` + `reset --hard`) — never `git pull --rebase`, which conflicts with itself on a generated file.
+- The MCP server (`mcp/`, FastMCP) reads sessions through one `DataStore`: a local clone, or GitHub in one request via `index.json`. The hosted entrypoint mounts the same server under `/{owner}/{repo}/mcp` and resolves a store per request, so one deployment serves any public data repo.
 - The extension pushes **two commits per save** (session, then solution), so data-repo CI must tolerate `main` moving mid-run.
 - `data/schema/session.schema.json` is the contract every component builds against, with `additionalProperties: false` throughout — new fields require a schema change, which is a **breaking** change per the tag policy above.

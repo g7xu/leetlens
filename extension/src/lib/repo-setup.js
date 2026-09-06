@@ -2,7 +2,7 @@
 // the sessions folder into the user's configured repo, so any repo — brand-new
 // or an existing LeetHub repo — becomes a working LeetLens data repo.
 
-import { getSettings, putFile } from './github.js';
+import { apiHeaders, getFileRaw, getSettings, putFile } from './github.js';
 
 // The tool repo whose dashboard + indexer the data-repo workflow checks out.
 const TOOL_REPO = 'g7xu/leetlens';
@@ -196,14 +196,40 @@ async function enablePages() {
   const { token, owner, repo } = await getSettings();
   const resp = await fetch(`https://api.github.com/repos/${owner}/${repo}/pages`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
+    headers: apiHeaders(token),
     body: JSON.stringify({ build_type: 'workflow' }),
   });
   return resp.ok || resp.status === 409;
+}
+
+/** CLAUDE.md is the user's file: add the AGENTS.md import to it, never replace it. */
+async function ensureClaudeImport() {
+  const existing = await getFileRaw('CLAUDE.md');
+  if (existing === null) {
+    await putFile('CLAUDE.md', CLAUDE_MD, 'leetlens: point Claude Code at AGENTS.md');
+  } else if (!existing.includes('@AGENTS.md')) {
+    await putFile('CLAUDE.md', `${existing.replace(/\n*$/, '\n\n')}${CLAUDE_MD}`,
+      'leetlens: point Claude Code at AGENTS.md', { overwrite: true });
+  }
+}
+
+/** .mcp.json may already list the user's other servers: only the leetlens entry is ours. */
+async function mergeMcpServer() {
+  const ours = JSON.parse(MCP_JSON);
+  const existing = await getFileRaw('.mcp.json');
+  let merged = ours;
+  if (existing !== null) {
+    let current;
+    try {
+      current = JSON.parse(existing);
+    } catch {
+      throw new Error('.mcp.json in the repo is not valid JSON — fix or remove it, then run setup again.');
+    }
+    merged = { ...current, mcpServers: { ...(current.mcpServers ?? {}), ...ours.mcpServers } };
+    if (JSON.stringify(merged) === JSON.stringify(current)) return;
+  }
+  await putFile('.mcp.json', `${JSON.stringify(merged, null, 2)}\n`,
+    'leetlens: project-scoped MCP server for Claude Code', { overwrite: true });
 }
 
 /**
@@ -230,10 +256,8 @@ export async function setupRepo() {
     'leetlens: create sessions folder', { overwrite: true });
   await putFile('AGENTS.md', AGENTS_MD,
     'leetlens: describe the repo for coding agents', { overwrite: true });
-  await putFile('CLAUDE.md', CLAUDE_MD,
-    'leetlens: point Claude Code at AGENTS.md', { overwrite: true });
-  await putFile('.mcp.json', MCP_JSON,
-    'leetlens: project-scoped MCP server for Claude Code', { overwrite: true });
+  await ensureClaudeImport();
+  await mergeMcpServer();
   await putFile('.gitignore', GITIGNORE,
     'leetlens: ignore local build folders', { overwrite: false }).catch(() => {
     /* repo already has a .gitignore — leave it alone */
