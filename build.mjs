@@ -46,6 +46,7 @@ function copyStatic() {
   for (const file of ['manifest.json', 'options.html']) {
     cpSync(`extension/${file}`, `${OUT}/${file}`);
   }
+  cpSync('extension/icons', `${OUT}/icons`, { recursive: true });
 }
 
 async function build() {
