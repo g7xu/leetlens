@@ -71,3 +71,8 @@ jobs:
 
       - name: MCP server compiles
         run: python3 -m compileall -q mcp/src
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: MCP server tests
+        run: uv run --directory mcp --group dev pytest -q

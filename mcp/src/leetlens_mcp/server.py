@@ -8,7 +8,7 @@ from typing import Literal
 
 from mcp.server.mcpserver import MCPServer
 
-from . import stats
+from . import documents, stats
 from .store import DataStore
 
 mcp = MCPServer("LeetLens")
@@ -41,15 +41,19 @@ def list_sessions(
     return rows[offset : offset + limit]
 
 
+def _problem_sessions(slug_or_id: str) -> list[dict]:
+    """That problem's sessions, oldest first; matches slug, dir_key, or frontend id."""
+    return [
+        r
+        for r in store.load_sessions()
+        if slug_or_id in (r["problem"]["slug"], r["problem"]["dir_key"], r["problem"]["frontend_id"])
+    ]
+
+
 @mcp.tool()
 def get_problem_details(slug_or_id: str) -> dict:
     """Full detail for one problem: every session record (phases, notes, tags) plus the committed solution source if present. Accepts a slug ('two-sum'), dir key ('0001-two-sum'), or frontend id ('1')."""
-    records = store.load_sessions()
-    matches = [
-        r
-        for r in records
-        if slug_or_id in (r["problem"]["slug"], r["problem"]["dir_key"], r["problem"]["frontend_id"])
-    ]
+    matches = _problem_sessions(slug_or_id)
     if not matches:
         return {"error": f"no sessions found for {slug_or_id!r}"}
     dir_key = matches[0]["problem"]["dir_key"]
@@ -58,6 +62,24 @@ def get_problem_details(slug_or_id: str) -> dict:
         "sessions": matches,
         "solution_source": store.load_solution(dir_key),
     }
+
+
+@mcp.tool()
+def search(query: str) -> dict:
+    """Free-text search over problems (title, slug, tags, logic ideas, comments) and tags; every word must match. Returns {"results": [{id, title, url}]} — pass an id to fetch. Follows the ChatGPT connector search contract."""
+    return {"results": documents.search_documents(store.load_sessions(), query)}
+
+
+@mcp.tool()
+def fetch(id: str) -> dict:
+    """One document by id from search. A problem id (dir key, slug, or frontend id) returns every attempt with phases, runs, notes, and the committed solution; "tag:<tag>" returns that tag's stats and sessions. Returns {id, title, text, url, metadata}; follows the ChatGPT connector fetch contract."""
+    if id.startswith(documents.TAG_PREFIX):
+        doc = documents.tag_document(store.load_sessions(), id[len(documents.TAG_PREFIX):])
+        return doc or {"error": f"no sessions carry tag {id!r}"}
+    matches = _problem_sessions(id)
+    if not matches:
+        return {"error": f"no sessions found for {id!r}"}
+    return documents.problem_document(matches, store.load_solution(matches[0]["problem"]["dir_key"]))
 
 
 @mcp.tool()

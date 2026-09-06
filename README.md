@@ -94,13 +94,15 @@ LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> \
   uv run --directory mcp leetlens-mcp --transport streamable-http --port 8765
 ```
 
-and add it as a connector in ChatGPT → Settings → Connectors (developer mode), e.g. through an `ngrok http 8765` tunnel. Private data repo? Also set `LCP_GITHUB_TOKEN` (the same fine-grained PAT works — Contents: read is enough), which switches fetching from raw.githubusercontent.com to the authenticated Contents API.
+and add it as a connector in ChatGPT → Settings → Connectors (developer mode), e.g. through an `ngrok http 8765` tunnel. The `search` / `fetch` pair follows ChatGPT's connector contract, so deep research can use the server too. Private data repo? Also set `LCP_GITHUB_TOKEN` (the same fine-grained PAT works — Contents: read is enough), which switches fetching from raw.githubusercontent.com to the authenticated Contents API.
 
 <details>
 <summary><b>Reference: tools, prompt, resources, env vars</b></summary>
 
 | Tool | What it answers |
 |---|---|
+| `search` | Free-text search over problems and tags, every word must match; the ChatGPT connector contract |
+| `fetch` | One document by id from `search`: a problem with every attempt + solution, or a tag with its stats |
 | `list_sessions` | Sessions newest first, filterable by tag / difficulty / outcome / date |
 | `get_problem_details` | Everything about one problem: all sessions + committed solution source |
 | `get_stats` | Aggregates per tag, difficulty, week, or month |
