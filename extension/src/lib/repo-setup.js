@@ -2,6 +2,7 @@
 // the sessions folder into the user's configured repo, so any repo — brand-new
 // or an existing LeetHub repo — becomes a working LeetLens data repo.
 
+import { getAccessToken } from './auth.js';
 import { apiHeaders, getFileRaw, getSettings, putFile } from './github.js';
 
 // The tool repo whose dashboard + indexer the data-repo workflow checks out.
@@ -196,7 +197,8 @@ export const MCP_JSON = `${JSON.stringify({
  * the PAT has the Pages permission; a 409 means Pages is already enabled.
  */
 async function enablePages() {
-  const { token, owner, repo } = await getSettings();
+  const { owner, repo } = await getSettings();
+  const token = await getAccessToken();
   const resp = await fetch(`https://api.github.com/repos/${owner}/${repo}/pages`, {
     method: 'POST',
     headers: apiHeaders(token),

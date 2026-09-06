@@ -1,8 +1,29 @@
 // Minimal GitHub Contents API client used by the service worker and options page.
+// Credentials come from auth.js; this file only knows how to spend them.
 
+import { getAccessToken, signOut } from './auth.js';
+
+/** Where sessions go: owner / repo / branch. Credentials live separately. */
 export async function getSettings() {
   const { github = {} } = await chrome.storage.local.get('github');
   return { branch: 'main', ...github };
+}
+
+async function requireToken() {
+  const token = await getAccessToken();
+  if (!token) {
+    throw new Error('LeetLens is not configured — open the extension options and connect GitHub.');
+  }
+  return token;
+}
+
+/** A 401 means the credential is dead, not that the request was wrong. */
+async function checkAuthorized(resp) {
+  if (resp.status === 401) {
+    await signOut();
+    throw new Error('GitHub 401: the sign-in is no longer valid — reconnect in the LeetLens options.');
+  }
+  return resp;
 }
 
 export function saveSettings(settings) {
@@ -35,28 +56,29 @@ function b64encode(text) {
  * where the Contents API requires the existing file's SHA.
  */
 export async function putFile(path, content, message, { overwrite = false } = {}) {
-  const { token, owner, repo, branch } = await getSettings();
-  if (!token || !owner || !repo) {
+  const { owner, repo, branch } = await getSettings();
+  if (!owner || !repo) {
     throw new Error('LeetLens is not configured — open the extension options first.');
   }
+  const token = await requireToken();
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodePath(path)}`;
   const body = { message, branch, content: b64encode(content) };
   if (overwrite) {
     // Without the existing file's SHA the PUT fails as 422; a 404 here is the
     // one answer that legitimately means "no SHA needed".
-    const existing = await fetch(`${url}?ref=${encodeURIComponent(branch)}`, {
+    const existing = await checkAuthorized(await fetch(`${url}?ref=${encodeURIComponent(branch)}`, {
       headers: apiHeaders(token),
-    });
+    }));
     if (existing.ok) body.sha = (await existing.json()).sha;
     else if (existing.status !== 404) {
       throw new Error(`GitHub ${existing.status}: could not read ${path} before overwriting it`);
     }
   }
-  const resp = await fetch(url, {
+  const resp = await checkAuthorized(await fetch(url, {
     method: 'PUT',
     headers: apiHeaders(token),
     body: JSON.stringify(body),
-  });
+  }));
   if (!resp.ok) {
     const respBody = await resp.text();
     throw new Error(`GitHub ${resp.status}: ${respBody.slice(0, 200)}`);
@@ -71,7 +93,8 @@ export async function putFile(path, content, message, { overwrite = false } = {}
  * limit can never be read as an empty repo by a caller about to overwrite.
  */
 export async function getFileRaw(path) {
-  const { token, owner, repo, branch } = await getSettings();
+  const { owner, repo, branch } = await getSettings();
+  const token = await getAccessToken();
   if (!token || !owner || !repo) return null;
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(branch)}`;
   const resp = await fetch(url, {
@@ -84,14 +107,32 @@ export async function getFileRaw(path) {
 
 /** Used by the options page "Test connection" button. */
 export async function testConnection(settings) {
-  const { token, owner, repo } = settings;
+  const { owner, repo } = settings;
+  const token = settings.token || (await getAccessToken());
+  if (!token) return { ok: false, error: 'not connected to GitHub yet' };
+  const auth = await loadAuthKind();
   const resp = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
     headers: apiHeaders(token),
   });
+  if (resp.status === 404) {
+    // A credential that cannot see a repo gets 404, not 403, so "not found"
+    // usually means "not granted" — and each kind is granted differently.
+    return {
+      ok: false,
+      error: auth === 'app'
+        ? `${owner}/${repo} is not visible — install the LeetLens app on it, or check the name`
+        : `repo lookup failed (404) — grant the token access to ${owner}/${repo}, or check the name`,
+    };
+  }
   if (!resp.ok) return { ok: false, error: `repo lookup failed (${resp.status})` };
   const info = await resp.json();
   if (!info.permissions?.push) {
-    return { ok: false, error: 'token cannot push — check Contents: Read and write' };
+    return { ok: false, error: 'no write access — check Contents: Read and write' };
   }
   return { ok: true, repo: info.full_name };
+}
+
+async function loadAuthKind() {
+  const { githubAuth } = await chrome.storage.local.get('githubAuth');
+  return githubAuth?.kind ?? null;
 }
