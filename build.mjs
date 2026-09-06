@@ -5,10 +5,7 @@
 //   node build.mjs --release  no source maps, minified
 //   node build.mjs --zip      also package dist/ for a GitHub release
 //
-// Why a bundler at all: a MAIN-world content script is loaded as a *classic*
-// script, so it cannot use `import`, and it has no chrome.* so it cannot use
-// the dynamic-import(chrome.runtime.getURL(...)) workaround either. Bundling
-// is the only way to share code with it. See ARCHITECTURE.md.
+// Why a bundler exists at all is in ARCHITECTURE.md ("Build").
 
 import { cpSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -23,13 +20,12 @@ const manifest = JSON.parse(readFileSync('extension/manifest.json', 'utf8'));
 
 // Output names are referenced by manifest.json, so they must stay stable —
 // never add content hashing here.
+// Formats are pinned, not a preference: the first two are loaded as classic
+// scripts (an `import` left in them is a runtime error), the last two as
+// modules (a mismatch fails registration with no useful error).
 const ENTRIES = [
-  // Classic content scripts: iife, because the browser does not load these as
-  // modules. Any `import` surviving into these files is a runtime error.
   { in: 'extension/src/inject/main-world.js', out: 'main-world', format: 'iife' },
   { in: 'extension/src/content/content.js', out: 'content', format: 'iife' },
-  // manifest declares "type": "module" for the worker, and options.html loads
-  // options.js with type="module" — a format mismatch here fails silently.
   { in: 'extension/src/background/service-worker.js', out: 'service-worker', format: 'esm' },
   { in: 'extension/options.js', out: 'options', format: 'esm' },
 ];

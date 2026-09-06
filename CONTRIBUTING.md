@@ -25,7 +25,7 @@ The quotes matter — a bare `test/` is resolved as a module path and fails.
 
 Tests import from `extension/src` directly, never from `dist/`, so they run without a build. The thinking-area tests pin the contract between the block that `main-world.js` writes and what `extractThinkingArea` parses back — those two files each still carry a copy of `THINK_HEADER_RE`, so **any change to the block format must update both files and the test fixtures together**.
 
-CI runs the tests on every PR, then builds and checks that no `import`/`export` survived into the two classic content scripts and that every path in `manifest.json` resolves. It also validates the data-repo workflow embedded as a template string in `repo-setup.js` (read from source, never the bundle — the text surgery it does would mangle bundled output) and compiles the Python.
+CI runs the Node and Python tests on every PR, builds, checks that no `import`/`export` survived into the two classic content scripts and that every path in `manifest.json` resolves, and YAML-parses the data-repo workflow that `repo-setup.js` exports as a template string.
 
 ## Working on the MCP server
 
@@ -39,7 +39,7 @@ Env vars: `LCP_REPO_PATH` (local mode root), or `LCP_SOURCE=github` with `LCP_GI
 
 - One branch + PR per issue, branched from up-to-date `main`.
 - Match the surrounding code: no frameworks, esbuild is the only build dependency, comments explain *why* not *what*.
-- `data/schema/session.schema.json` uses `additionalProperties: false` throughout — adding a session field means changing the schema, and that is a **breaking** change (see the tag policy below).
+- `data/schema/session.schema.json` uses `additionalProperties: false` throughout — adding a session field means changing the schema, and that is a **breaking** change under the tag policy in [ARCHITECTURE.md](ARCHITECTURE.md#the-two-repo-model).
 
 ## Sharp edges
 
@@ -72,6 +72,6 @@ gh release create vX.Y.Z leetlens-*.zip --title "..." --notes "..."
 git tag -f v1 vX.Y.Z && git push -f origin v1   # compatible changes only
 ```
 
-The zip is how people install the extension, so **a release without it leaves users with no way to get it** — that is exactly what happened with v1.0.0. Breaking changes (schema, index shape, dashboard data contract) get a new major tag instead of moving `v1`. Remember the data-repo workflow file is copied into each data repo at setup, so tag moves don't update it.
+The zip is how people install the extension, so **a release without it leaves users with no way to get it** — that is exactly what happened with v1.0.0. Whether to move `v1` or cut a new major tag is the policy in ARCHITECTURE.md.
 
 **Pages deploys.** Retry a failed deploy with a fresh `workflow_dispatch` run — never `gh run rerun`, which duplicates the `github-pages` artifact and the deploy step rejects it.

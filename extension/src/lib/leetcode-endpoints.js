@@ -21,11 +21,8 @@ const QUESTION_QUERY = `
     }
   }`;
 
-/**
- * Problem metadata plus LeetCode's own topic tags. topic_tags is returned
- * alongside (not inside) the problem object because the session schema
- * forbids extra properties on `problem` — callers keep them separate.
- */
+// topic_tags sits beside `problem`, not inside it: the session schema forbids
+// extra properties on `problem`.
 export async function fetchProblemMeta(slug) {
   const resp = await fetch('https://leetcode.com/graphql/', {
     method: 'POST',
@@ -49,18 +46,12 @@ export async function fetchProblemMeta(slug) {
 }
 
 // Openers main-world.js writes, plus the line-comment tokens older blocks used.
-// `#|` must precede `#`, since the captured opener is what selects the parsing
-// branch below and the alternation is ordered.
-//
-// The trailing `[ \t]` (not `\s`) matters twice over: `\s` would match a
-// newline and let the pattern run past the header line, and requiring a space
-// or tab after `/*` is what stops LeetCode's own `/** Definition for ListNode
-// … */` template docblock from being read as a thinking area and stripped out
-// of the committed solution. Never loosen this to `\/\*+`.
-//
-// main-world.js carries its own copy of this pattern (it is a MAIN-world
-// script and cannot import). Keep the two in sync; test/thinking-area.test.mjs
-// pins the shapes both sides must agree on.
+// `#|` must precede `#`: the alternation is ordered and the captured opener
+// selects the parsing branch. The trailing `[ \t]` (not `\s`) keeps the match
+// on the header line and, after `/*`, is what stops LeetCode's own `/** …`
+// ListNode docblock from being taken for a thinking area and stripped from
+// the committed solution. Never loosen it to `\/\*+`. main-world.js carries a
+// copy (MAIN-world scripts cannot import); test/thinking-area.test.mjs pins both.
 const THINK_HEADER_RE = /^[ \t]*(r?"""|'''|\/\*|=begin|#\||#|\/\/|--|;|%)[ \t]*Thinking area\b/i;
 const THINK_DELIM_RE = /^[#/;%-]{8,}$/;
 
@@ -88,11 +79,8 @@ export function extractThinkingArea(code) {
   const closer = BLOCK_CLOSER[opener.toLowerCase()];
   let open, close, strip;
   if (closer) {
-    // Notes start directly under the header. The closer must be alone on its
-    // line — that is how we write it. Matching it as a substring instead would
-    // end the block early on a note like `careful: */ ends a comment`, which
-    // strands the rest of that note, and the orphaned closer, at the top of
-    // the file we commit as the solution.
+    // The closer must be alone on its line, which is how we write it; matching
+    // it as a substring would end the block early on a note that mentions it.
     open = head;
     close = lines.findIndex((l, i) => i > head && l.trim() === closer);
     // Monaco continues some block comments with ' * '; users also type bullets.
@@ -109,9 +97,8 @@ export function extractThinkingArea(code) {
   let rest = close + 1;
   while (rest < lines.length && !lines[rest].trim()) rest++;
   const remaining = lines.slice(rest).join('\n');
-  // A note containing the closer splits the block early, which would strand the
-  // rest of the note — and the orphaned closer — at the top of the file we
-  // commit. Treat that as no block at all rather than write corrupted code.
+  // A closer inside a note would strand the rest of that note at the top of the
+  // committed solution; treat that as no block at all rather than corrupt code.
   if (closer && (lines[rest] ?? '').trim().includes(closer)) return { notes: '', code };
 
   const notes = lines

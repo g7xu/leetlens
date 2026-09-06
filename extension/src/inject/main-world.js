@@ -1,11 +1,7 @@
 // Runs in the page's MAIN world at document_start. Observes LeetCode's own
 // network traffic (never blocks or modifies it) and reports events to the
 // content script via window.postMessage. Holds no state beyond pending ids.
-//
-// Chrome loads this as a *classic* script and gives it no chrome.* APIs, so it
-// can neither `import` nor reach for chrome.runtime.getURL. The build bundles
-// it into one self-contained IIFE (see build.mjs); nothing may remain in the
-// output that the browser would have to resolve at runtime.
+// No chrome.* here and no runtime imports: the build inlines everything.
 (() => {
   'use strict';
 
@@ -117,27 +113,18 @@
   };
 
   // -- thinking area -----------------------------------------------------
-  // Prepend a comment block to the top of the code editor so the approach
-  // gets sketched where the user already is — in the editor — before coding.
-  // The content script later strips this block from the captured code and
-  // turns it into the session's logic-idea draft.
-  //
-  // It must be a *block* comment. Monaco does not re-insert a line-comment
-  // token when the user presses Enter, so a `#`-prefixed region only protects
-  // the lines we pre-write — the next line of notes would be parsed as code.
-  //
-  // LeetCode registers Monaco languages under its own slugs (model
-  // .getLanguageId() returns 'python3', 'golang', 'oraclesql', …), so match
-  // those — not Monaco's standard ids.
+  // A comment block prepended to the editor for sketching the approach; the
+  // content script strips it from captured code and keeps the text as the
+  // logic-idea draft. Why it must be a *block* comment, and why the language
+  // ids are LeetCode's own slugs, is in ARCHITECTURE.md ("The thinking-area
+  // contract").
   function blockDelimiters(langId) {
-    // r-string: notes containing \d or a Windows path would otherwise raise
+    // r-string: a `\d` or a Windows path in the notes would otherwise raise
     // SyntaxWarning on Python 3.12+.
     if (['python', 'python3', 'pythondata'].includes(langId)) return ['r"""', '"""'];
     if (langId === 'ruby') return ['=begin', '=end']; // must stay at column 0
     if (langId === 'racket') return ['#|', '|#'];
-    // No block-comment form exists in these, and a region that breaks the
-    // moment you press Enter is worse than none — those users still have the
-    // logic-idea box on the save form.
+    // No block-comment form: no block. The save form's logic-idea box remains.
     if (['erlang', 'elixir', 'bash', 'shell'].includes(langId)) return null;
     return ['/*', '*/']; // C family, and every SQL dialect LeetCode offers
   }

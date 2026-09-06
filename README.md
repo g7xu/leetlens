@@ -6,15 +6,7 @@ LeetLens is a companion to [LeetHub-3.0](https://github.com/raphaelheinz/LeetHub
 
 Like LeetHub, this repo is only the tool. Your data lives in a repo you own — new, or your existing LeetHub repo (the layouts are compatible).
 
-## Components
-
-| Piece | Where | What it does |
-|---|---|---|
-| Chrome extension | `extension/` → `dist/` | Tracker panel on leetcode.com; commits sessions + solutions to *your* repo; one-click repo setup |
-| Your data repo | `<owner>/<your-repo>` | `data/sessions/<problem>/<timestamp>_<id>.json` per attempt, solutions in LeetHub layout, dashboard on its GitHub Pages |
-| MCP server | `mcp/` | Tools for LLMs: sessions, stats, trends, weak areas — pointed at your data repo |
-| Dashboard | `dashboard/` | Static site; your data repo's workflow deploys it with your data |
-| Session schema | `data/schema/session.schema.json` | The contract every component builds against |
+Four pieces: the Chrome extension (`extension/`), the MCP server (`mcp/`), the dashboard (`dashboard/`), and the session schema (`data/schema/`) they all build against. How they fit together is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Setup
 
@@ -62,7 +54,7 @@ That's it. Open any LeetCode problem — the LeetLens panel appears, a *thinking
 
 Write as much as you like in the thinking area: it's a block comment, so it never affects your code, time spent there counts as *thinking* rather than *writing*, and its text is read when you finish and used to fill in the session's logic idea. It's stripped from the solution file that gets committed. Languages with no block-comment syntax (Erlang, Elixir, Bash) don't get one — use the logic-idea box on the save form instead.
 
-Your data repo's workflow pins the LeetLens toolchain with `LEETLENS_REF: v1` — a moving major tag that picks up compatible improvements automatically. Pin an exact release tag in your workflow file if you prefer reproducibility.
+Your data repo's workflow pins the LeetLens toolchain with `LEETLENS_REF: v1`, a moving major tag; pin an exact release tag instead if you prefer reproducibility. The tag policy is in [ARCHITECTURE.md](ARCHITECTURE.md#the-two-repo-model).
 
 ### 5. MCP server (Claude Code / Claude Desktop / ChatGPT)
 
@@ -134,7 +126,7 @@ Plus the `weekly_review` prompt and two resources: `leetlens://index` and `leetl
 
 ## Data model
 
-Each session file records: problem metadata, `started_at`/`ended_at`, ordered phase segments (`thinking|writing|reviewing|debugging`, each `auto` or `manual`), per-phase totals, `run_count` / `failed_run_count` / `submit_count`, `outcome` (`accepted` / `gave_up` / `abandoned`), `logic_idea`, `tags`, `comments`. See `data/schema/session.schema.json` — the schema is the contract for every component.
+One JSON file per attempt, described field by field in [`data/schema/session.schema.json`](data/schema/session.schema.json).
 
 ## Development
 
@@ -149,7 +141,7 @@ python3 -m http.server -d /path/to/your-data-repo 8000
 # then copy dashboard/* next to that data, or open the deployed Pages site
 ```
 
-Contributions welcome — the extension is plain MV3 JavaScript bundled with esbuild, the MCP server is a small uv project, and the dashboard is a static page. Start with [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit and why, then [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the sharp edges.
+Contributions welcome: [CONTRIBUTING.md](CONTRIBUTING.md) has the workflow and the sharp edges.
 
 ## License
 

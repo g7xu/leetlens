@@ -1,9 +1,6 @@
 // Isolated-world orchestrator: owns the session machine + panel lifecycle,
 // bridges MAIN-world events, persists state, and hands finished sessions to
 // the service worker for the GitHub commit.
-//
-// The build inlines these imports (see build.mjs) — Chrome loads this as a
-// classic script, so nothing may remain in the output.
 import { SessionMachine } from '../state/session-machine.js';
 import { Panel } from './panel.js';
 import * as endpoints from '../lib/leetcode-endpoints.js';
@@ -334,9 +331,8 @@ import * as endpoints from '../lib/leetcode-endpoints.js';
     panel?.update(machine);
   });
 
-  // First keystroke in the editor flips thinking -> writing — but only when it
-  // lands in the code. Typing in the thinking area is still thinking, and
-  // counting it as writing would zero out the phase the tool exists to measure.
+  // The first keystroke in the *code* flips thinking -> writing; a keystroke
+  // in the thinking area does not (cursorInThinkingArea in main-world.js).
   let caretProbeInFlight = false;
 
   document.addEventListener(
@@ -345,19 +341,15 @@ import * as endpoints from '../lib/leetcode-endpoints.js';
       if (!machine || machine.ended) return;
       if (!(event.target?.closest?.(endpoints.EDITOR_SELECTOR) ||
             event.target?.classList?.contains('inputarea'))) return;
-      // Typing is activity wherever it lands, so un-pausing must not depend on
-      // the caret check below.
+      // Typing is activity wherever it lands; un-pausing never waits for the caret probe.
       machine.resume();
-      // The flip happens once. After it, editorInput() can no longer change
-      // the phase, so skip asking the MAIN world where the caret is.
+      // The flip happens once; afterwards the caret's position cannot matter.
       if (machine.hasWritten || machine.currentPhase !== 'thinking') {
         machine.editorInput();
         panel?.update(machine);
         return;
       }
-      // At most one probe outstanding: this fires per keystroke while the user
-      // is still in the thinking phase.
-      if (caretProbeInFlight) return;
+      if (caretProbeInFlight) return; // one probe per burst of keystrokes
       caretProbeInFlight = true;
       requestEditorCode().then((live) => {
         caretProbeInFlight = false;
