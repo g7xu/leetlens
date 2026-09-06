@@ -290,7 +290,7 @@ def compare_periods(
                 if r["total_active_sec"]
             ]
             st["debugging_share"] = round(mean(shares), 3) if shares else 0
-        return {"spec": spec, "from": lo, "to": hi, **st}
+        return {"spec": spec, "date_from": lo, "date_to": hi, **st}
 
     a, b = period(period_a), period(period_b)
     deltas = {
