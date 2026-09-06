@@ -47,7 +47,7 @@ def search_documents(records: list[dict], query: str, limit: int = 20) -> list[d
     """Problems and tags matching every term of `query`, best first.
 
     Each whitespace-separated term must hit somewhere in a problem's title,
-    slug, tags, logic ideas, or comments (AND semantics). A problem scores the
+    slug, tags, LeetCode topics, logic ideas, or comments (AND semantics). A problem scores the
     sum of its best field per term, so a title hit outranks a tag hit, which
     outranks a note hit; ties go to the most recently attempted problem.
     Tags containing every term are appended as "tag:<tag>" hits.
@@ -59,7 +59,7 @@ def search_documents(records: list[dict], query: str, limit: int = 20) -> list[d
     for dir_key, rs in _by_problem(records).items():
         prob = rs[0]["problem"]
         title = f"{prob['title']} {prob['slug']} {dir_key}".lower()
-        tags = {t for r in rs for t in r.get("tags", [])}
+        tags = {t for r in rs for t in r.get("tags", [])} | set(prob.get("topics", []))
         notes = " ".join(f"{r.get('logic_idea', '')} {r.get('comments', '')}" for r in rs).lower()
         per_term = [_term_score(t, title, tags, notes) for t in terms]
         if all(per_term):
@@ -98,6 +98,8 @@ def _session_lines(rec: dict, heading: str) -> list[str]:
     ]
     if rec.get("tags"):
         lines.append("Tags: " + ", ".join(rec["tags"]))
+    if rec["problem"].get("topics"):
+        lines.append("LeetCode topics: " + ", ".join(rec["problem"]["topics"]))
     if rec.get("logic_idea"):
         lines.append(f"Logic idea: {rec['logic_idea']}")
     if rec.get("comments"):
@@ -140,6 +142,7 @@ def problem_document(records: list[dict], solution_source: str | None) -> dict:
             "gave_up": gave_up,
             "solved": accepted > 0,
             "tags": tags,
+            "topics": prob.get("topics", []),
             "last_session_at": records[-1]["started_at"],
             "has_solution": solution_source is not None,
         },

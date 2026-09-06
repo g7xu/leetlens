@@ -9,7 +9,7 @@ const TOOL_REPO = 'g7xu/leetlens';
 
 // Pinned major tag of the toolchain; the maintainer moves it for compatible
 // updates. Users can pin an exact tag (e.g. v1.0.0) in their own repo.
-const TOOL_REF = 'v1';
+const TOOL_REF = 'v2';
 
 const WORKFLOW_PATH = '.github/workflows/publish.yml';
 
@@ -145,7 +145,10 @@ what they solved.
   (after a failed run). \`total_active_sec\` is their sum; pauses are excluded.
 - \`run_count\` / \`failed_run_count\` / \`submit_count\`: how many tries it took.
 - \`logic_idea\`: the person's own description of their approach, written before or
-  while coding. \`comments\`: notes on the save form. \`tags\`: their own labels.
+  while coding. \`comments\`: notes on the save form.
+- Two kinds of label: \`tags\` are the person's own (they may use none), while
+  \`problem.topics\` are LeetCode's, recorded automatically for every problem.
+  Prefer topics for "what am I bad at", tags for "what was I working on".
 - \`attempt_number\` (in the index only): 1 for the first session on a problem, 2
   for the next, and so on. A problem with a \`gave_up\` session and no later
   \`accepted\` one is unfinished.

@@ -22,7 +22,6 @@ import { extractThinkingArea } from '../lib/thinking-area.js';
   let heartbeatId = null;
 
   const storageKey = (slug) => `session:${slug}`;
-  let currentTopicTags = []; // LeetCode's own topic tags for the current problem
 
   async function getKnownTags() {
     try {
@@ -34,7 +33,7 @@ import { extractThinkingArea } from '../lib/thinking-area.js';
   }
 
   /** Save-form suggestions: locally used tags, then the repo's tag vocabulary
-   *  (works on a fresh profile), then LeetCode's topic tags for this problem. */
+   *  (works on a fresh profile), then this problem's LeetCode topics. */
   async function getSuggestedTags() {
     const local = await getKnownTags();
     let repoTags = [];
@@ -43,7 +42,7 @@ import { extractThinkingArea } from '../lib/thinking-area.js';
     } catch {
       /* service worker unavailable — local suggestions still work */
     }
-    return [...new Set([...local, ...repoTags, ...currentTopicTags])];
+    return [...new Set([...local, ...repoTags, ...(machine?.problem?.topics ?? [])])];
   }
 
   async function rememberTags(tags) {
@@ -235,9 +234,7 @@ import { extractThinkingArea } from '../lib/thinking-area.js';
     currentSlug = slug;
     let problem;
     try {
-      const meta = await endpoints.fetchProblemMeta(slug);
-      problem = meta.problem;
-      currentTopicTags = meta.topic_tags;
+      problem = (await endpoints.fetchProblemMeta(slug)).problem;
     } catch {
       return; // not a solvable problem page (or GraphQL changed) — stay out of the way
     }

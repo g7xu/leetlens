@@ -26,6 +26,11 @@ def test_search_ties_go_to_most_recent(records):
     assert hits[-1] == "tag:hash-map"
 
 
+def test_search_finds_a_problem_by_its_leetcode_topic(records):
+    # No session carries "depth-first-search" as a user tag; LeetCode does.
+    assert ids(documents.search_documents(records, "depth-first-search")) == ["0200-number-of-islands"]
+
+
 def test_search_matches_notes_and_tags(records):
     hits = documents.search_documents(records, "window")
     assert ids(hits) == ["0003-longest-substring-without-repeating-characters", "tag:sliding-window"]
@@ -60,9 +65,11 @@ def test_problem_document(records):
         "gave_up": 2,
         "solved": False,
         "tags": ["dp"],
+        "topics": ["array", "dynamic-programming", "breadth-first-search"],
         "last_session_at": "2026-08-20T10:00:00Z",
         "has_solution": True,
     }
+    assert "LeetCode topics: array, dynamic-programming" in text
 
 
 def test_problem_document_without_solution(records):

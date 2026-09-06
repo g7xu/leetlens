@@ -31,6 +31,7 @@ class Problem(BaseModel):
     title: str
     difficulty: Difficulty
     url: str = Field(description="Canonical problem URL on leetcode.com")
+    topics: list[str] = Field(default=[], description="LeetCode's own topic tags, recorded automatically for every problem")
 
 
 class PhaseSegment(BaseModel):
@@ -60,6 +61,7 @@ class SessionSummary(_SessionCore):
     title: str
     difficulty: Difficulty
     date: str = Field(description="YYYY-MM-DD of started_at")
+    topics: list[str] = Field(default=[], description="The problem's LeetCode topics")
 
 
 class SessionRecord(_SessionCore):
@@ -103,7 +105,8 @@ class TrendPoint(BaseModel):
 
 
 class WeakArea(BaseModel):
-    tag: str
+    label: str = Field(description="The tag or topic being ranked")
+    kind: Literal["tag", "topic"] = Field(description="Which vocabulary `label` comes from")
     score: float = Field(description="0.4*give_up_rate + 0.3*slowness + 0.2*debugging_share + 0.1*run_factor; higher is weaker")
     give_up_rate: float
     avg_total_sec: int
@@ -116,7 +119,8 @@ class WeakArea(BaseModel):
 
 
 class TagUsage(BaseModel):
-    tag: str
+    label: str
+    kind: Literal["tag", "topic"]
     session_count: int
     problem_count: int
     last_seen: str = Field(description="YYYY-MM-DD")
@@ -132,10 +136,12 @@ class RevengeProblem(BaseModel):
     gave_up_count: int
     last_tried: str = Field(description="YYYY-MM-DD of the most recent session, whatever its outcome")
     tags: list[str]
+    topics: list[str] = []
 
 
 class StaleTag(BaseModel):
-    tag: str
+    label: str
+    kind: Literal["tag", "topic"]
     last_seen: str = Field(description="YYYY-MM-DD")
     days_since: int
     session_count: int
@@ -143,7 +149,9 @@ class StaleTag(BaseModel):
 
 
 class Recommendation(BaseModel):
-    type: Literal["revenge", "weak_tag", "stale_tag"] = Field(description="Which signal produced the suggestion")
+    type: Literal["revenge", "weak_tag", "weak_topic", "stale_tag", "stale_topic"] = Field(
+        description="Which signal produced the suggestion"
+    )
     action: str = Field(description="Imperative one-liner, e.g. 'Re-attempt Coin Change (Medium)'")
     target: str = Field(description="Problem URL for revenge, otherwise the tag name")
     reason: str = Field(description="The numbers behind the suggestion, ready to quote")

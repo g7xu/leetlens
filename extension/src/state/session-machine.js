@@ -5,7 +5,7 @@ export const PHASES = ['thinking', 'writing', 'reviewing', 'debugging'];
 
 export class SessionMachine {
   constructor(problem, now = Date.now()) {
-    this.problem = problem; // { frontend_id, dir_key, slug, title, difficulty, url }
+    this.problem = problem; // { frontend_id, dir_key, slug, title, difficulty, url, topics }
     this.sessionId = SessionMachine.randomId();
     this.startedAt = now;
     this.endedAt = null;
@@ -162,7 +162,7 @@ export class SessionMachine {
     const iso = (ms) => new Date(ms).toISOString();
     const totals = phaseTotalsOverride ?? this.phaseTotalsSec(this.endedAt);
     return {
-      schema_version: 1,
+      schema_version: 2,
       session_id: this.sessionId,
       problem: this.problem,
       language: this.language ?? 'unknown',

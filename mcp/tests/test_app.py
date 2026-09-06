@@ -71,7 +71,7 @@ def test_root_explains_how_to_connect(hosted):
 
 def test_each_url_serves_its_own_repo(hosted, two_repos, records):
     full = call(hosted + "/o/full/mcp", "list_tags")
-    assert [t["tag"] for t in full.structured_content["result"]] == sorted({t for r in records for t in r["tags"]})
+    assert [t["label"] for t in full.structured_content["result"]] == sorted({t for r in records for t in r["tags"]})
     assert two_repos["o/full"].requests == ["https://raw.githubusercontent.com/o/full/main/data/index.json"]
 
     # Each failure says which one it is, so the user knows what to do next.

@@ -24,8 +24,6 @@ const QUESTION_QUERY = `
     }
   }`;
 
-// topic_tags sits beside `problem`, not inside it: the session schema forbids
-// extra properties on `problem`.
 export async function fetchProblemMeta(slug) {
   const resp = await fetch(GRAPHQL_URL, {
     method: 'POST',
@@ -43,8 +41,8 @@ export async function fetchProblemMeta(slug) {
       title: q.title,
       difficulty: q.difficulty,
       url: `https://leetcode.com/problems/${slug}/`,
+      topics: (q.topicTags ?? []).map((t) => t.slug),
     },
-    topic_tags: (q.topicTags ?? []).map((t) => t.slug),
   };
 }
 

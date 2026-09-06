@@ -26,6 +26,7 @@ def make_record(
     failed_run_count: int = 0,
     submit_count: int = 1,
     tags: tuple[str, ...] = (),
+    topics: tuple[str, ...] = (),
     logic_idea: str = "",
     comments: str = "",
 ) -> dict:
@@ -33,7 +34,7 @@ def make_record(
     totals = {p: phases.get(p, 0) for p in PHASES}
     total = sum(totals.values())
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "session_id": session_id,
         "problem": {
             "frontend_id": str(int(number)),
@@ -42,6 +43,7 @@ def make_record(
             "title": title,
             "difficulty": difficulty,
             "url": f"https://leetcode.com/problems/{slug}/",
+            "topics": list(topics),
         },
         "language": "python3",
         "started_at": f"{started}T10:00:00Z",
@@ -87,6 +89,7 @@ def records() -> list[dict]:
                 outcome="accepted",
                 phases={"thinking": 60, "writing": 120, "reviewing": 30},
                 tags=("hash-map", "array"),
+                topics=("array", "hash-table"),
                 logic_idea="one pass with a hash map from value to index",
             ),
             make_record(
@@ -101,6 +104,7 @@ def records() -> list[dict]:
                 failed_run_count=5,
                 submit_count=0,
                 tags=("sliding-window", "hash-map"),
+                topics=("hash-table", "string", "sliding-window"),
                 comments="kept getting the window bounds off by one",
             ),
             make_record(
@@ -113,6 +117,7 @@ def records() -> list[dict]:
                 phases={"thinking": 120, "writing": 300, "reviewing": 60, "debugging": 120},
                 run_count=2,
                 tags=("sliding-window",),
+                topics=("hash-table", "string", "sliding-window"),
                 logic_idea="two pointers; move left past the last seen index",
             ),
             make_record(
@@ -127,6 +132,7 @@ def records() -> list[dict]:
                 failed_run_count=4,
                 submit_count=0,
                 tags=("dp",),
+                topics=("array", "dynamic-programming", "breadth-first-search"),
                 logic_idea="greedy by largest coin fails; needs dp over amounts",
             ),
             make_record(
@@ -141,6 +147,7 @@ def records() -> list[dict]:
                 failed_run_count=7,
                 submit_count=1,
                 tags=("dp",),
+                topics=("array", "dynamic-programming", "breadth-first-search"),
                 comments="dp table right but forgot the -1 for unreachable amounts",
             ),
             make_record(
@@ -152,6 +159,7 @@ def records() -> list[dict]:
                 outcome="accepted",
                 phases={"thinking": 90, "writing": 240, "reviewing": 30},
                 tags=("bfs", "grid"),
+                topics=("array", "depth-first-search", "breadth-first-search"),
                 logic_idea="flood fill each unvisited land cell",
             ),
         ]

@@ -54,7 +54,9 @@ That's it. Open any LeetCode problem — the LeetLens panel appears, a *thinking
 
 Write as much as you like in the thinking area: it's a block comment, so it never affects your code, time spent there counts as *thinking* rather than *writing*, and its text is read when you finish and used to fill in the session's logic idea. It's stripped from the solution file that gets committed. Languages with no block-comment syntax (Erlang, Elixir, Bash) don't get one — use the logic-idea box on the save form instead.
 
-Your data repo's workflow pins the LeetLens toolchain with `LEETLENS_REF: v1`, a moving major tag; pin an exact release tag instead if you prefer reproducibility. The tag policy is in [ARCHITECTURE.md](ARCHITECTURE.md#the-two-repo-model).
+Your data repo's workflow pins the LeetLens toolchain with `LEETLENS_REF: v2`, a moving major tag; pin an exact release tag instead if you prefer reproducibility. The tag policy is in [ARCHITECTURE.md](ARCHITECTURE.md#the-two-repo-model).
+
+> **Upgrading from `v1`.** Sessions now record LeetCode's own topic tags, so weak-area analysis works even if you never tag anything yourself. Change `LEETLENS_REF: v1` to `v2` in your data repo's `.github/workflows/publish.yml` and push; old sessions keep working, they just have no topics. Staying on `v1` is fine — v1 ignores the new field.
 
 ### 5. MCP server (Claude Code / Claude Desktop / ChatGPT)
 

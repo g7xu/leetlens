@@ -117,6 +117,10 @@ TagFilter = Annotated[
     str | None,
     Field(description="Only sessions carrying this user tag, e.g. 'sliding-window'; list_tags shows the vocabulary"),
 ]
+LabelKind = Annotated[
+    Literal["tag", "topic"],
+    Field(description="Which vocabulary to rank: 'tag' is what the user typed themselves (may be sparse or absent), 'topic' is LeetCode's own, recorded for every problem"),
+]
 DateFrom = Annotated[str | None, Field(description="Earliest session date to include, YYYY-MM-DD, inclusive")]
 DateTo = Annotated[str | None, Field(description="Latest session date to include, YYYY-MM-DD, inclusive")]
 ProblemId = Annotated[
@@ -229,8 +233,8 @@ def fetch(
 @tool("Grouped stats")
 def get_stats(
     group_by: Annotated[
-        Literal["tag", "difficulty", "week", "month"],
-        Field(description="What each group is: a user tag, a difficulty, an ISO week, or a calendar month"),
+        Literal["tag", "topic", "difficulty", "week", "month"],
+        Field(description="What each group is: a user tag, a LeetCode topic, a difficulty, an ISO week, or a calendar month"),
     ] = "tag",
 ) -> dict[str, models.GroupStats]:
     """Aggregate numbers per group: session and problem counts, give-up rate,
@@ -265,39 +269,44 @@ def get_trends(
 @tool("Weak areas")
 def get_weak_areas(
     min_sessions: Annotated[
-        int, Field(description="Ignore tags with fewer sessions than this; guards against one bad day", ge=1)
+        int, Field(description="Ignore labels with fewer sessions than this; guards against one bad day", ge=1)
     ] = 2,
-    top_n: Annotated[int, Field(description="How many tags to return", ge=1)] = 5,
+    top_n: Annotated[int, Field(description="How many labels to return", ge=1)] = 5,
+    by: LabelKind = "topic",
 ) -> list[models.WeakArea]:
-    """Tags ranked weakest first. Score = 0.4*give_up_rate + 0.3*relative
-    slowness + 0.2*debugging share + 0.1*run-count factor; every component is
-    returned so the ranking can be explained, or re-weighted.
+    """Tags or topics ranked weakest first. Score = 0.4*give_up_rate +
+    0.3*relative slowness + 0.2*debugging share + 0.1*run-count factor; every
+    component is returned so the ranking can be explained, or re-weighted.
 
-    Use this as the starting point for a diagnosis. To compute a different
-    view of weakness from the raw data, use export_sessions.
+    Use this as the starting point for a diagnosis. Topics are the default
+    because LeetCode supplies them for every problem, so the ranking holds
+    even when the user tags nothing; pass by='tag' for their own vocabulary.
     """
-    return stats.weak_areas(load_sessions(), min_sessions, top_n)
+    return stats.weak_areas(load_sessions(), min_sessions, top_n, kind=by)
 
 
 @tool("List tags")
 def list_tags(
-    prefix: Annotated[str | None, Field(description="Only tags starting with this text")] = None,
+    prefix: Annotated[str | None, Field(description="Only labels starting with this text")] = None,
+    kind: LabelKind = "tag",
 ) -> list[models.TagUsage]:
-    """Every user-created tag with session and problem counts and the date it
-    was last practised. Tags are free text chosen by the user, so this is the
-    vocabulary to use in the tag filters of other tools.
+    """Every label of one kind with session and problem counts and the date it
+    was last practised. This is the vocabulary the tag filters of other tools
+    accept; an empty result for kind='tag' means the user tags nothing, and
+    kind='topic' is the vocabulary to use instead.
     """
     rows = [
         {
-            "tag": tag,
+            "label": label,
+            "kind": kind,
             "session_count": st["session_count"],
             "problem_count": st["problem_count"],
             "last_seen": st["last_seen"],
         }
-        for tag, st in stats.by_tag(load_sessions()).items()
+        for label, st in stats.by_label(load_sessions(), kind).items()
     ]
     if prefix:
-        rows = [r for r in rows if r["tag"].startswith(prefix)]
+        rows = [r for r in rows if r["label"].startswith(prefix)]
     return rows
 
 
@@ -311,12 +320,13 @@ def get_revenge_list() -> list[models.RevengeProblem]:
 
 @tool("Stale tags")
 def get_stale_tags(
-    days: Annotated[int, Field(description="A tag is stale when not practised for this many days", ge=1)] = 30,
+    days: Annotated[int, Field(description="A label is stale when not practised for this many days", ge=1)] = 30,
+    by: LabelKind = "topic",
 ) -> list[models.StaleTag]:
-    """Tags not practised recently, most stale first: the spaced-repetition
-    signal for what is about to be forgotten.
+    """Tags or topics not practised recently, most stale first: the
+    spaced-repetition signal for what is about to be forgotten.
     """
-    return stats.stale_tags(load_sessions(), days)
+    return stats.stale_tags(load_sessions(), days, kind=by)
 
 
 @tool("Recommend next")

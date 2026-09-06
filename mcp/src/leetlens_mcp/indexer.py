@@ -30,6 +30,7 @@ def build_index(root: Path) -> dict:
         "problems": stats.problem_summaries(records),
         "sessions": [stats.session_summary(r) for r in records],
         "tags": stats.by_tag(records),
+        "topics": stats.by_topic(records),
         "daily": stats.daily_activity(records),
         # Full records, so a remote reader (the hosted MCP server) needs this one
         # file and no per-session fetches. The workflow that lands in every data
