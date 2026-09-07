@@ -193,18 +193,24 @@ export const MCP_JSON = `${JSON.stringify({
 `;
 
 /**
- * Best-effort: enable GitHub Pages with workflow builds. Succeeds only when
- * the PAT has the Pages permission; a 409 means Pages is already enabled.
+ * Point GitHub Pages at the workflow build, reporting the status when it
+ * cannot, so the caller can say which fix applies.
+ *
+ * Creating returns 409 when a site already exists, which says nothing about
+ * how that site builds. A repo left on "deploy from a branch" answers 409 and
+ * then rejects every deployment the workflow produces, so the update call —
+ * not the create — is what makes an existing site work.
  */
-async function enablePages() {
+export async function enablePages() {
   const { owner, repo } = await getSettings();
   const token = await getAccessToken();
-  const resp = await fetch(`https://api.github.com/repos/${owner}/${repo}/pages`, {
-    method: 'POST',
-    headers: apiHeaders(token),
-    body: JSON.stringify({ build_type: 'workflow' }),
-  });
-  return resp.ok || resp.status === 409;
+  const url = `https://api.github.com/repos/${owner}/${repo}/pages`;
+  const body = JSON.stringify({ build_type: 'workflow' });
+  const created = await fetch(url, { method: 'POST', headers: apiHeaders(token), body });
+  if (created.ok) return { enabled: true };
+  if (created.status !== 409) return { enabled: false, status: created.status };
+  const updated = await fetch(url, { method: 'PUT', headers: apiHeaders(token), body });
+  return updated.ok ? { enabled: true } : { enabled: false, status: updated.status };
 }
 
 /** CLAUDE.md is the user's file: add the AGENTS.md import to it, never replace it. */
@@ -267,11 +273,11 @@ export async function setupRepo() {
     'leetlens: ignore local build folders', { overwrite: false }).catch(() => {
     /* repo already has a .gitignore — leave it alone */
   });
-  let pagesEnabled = false;
+  let pages = { enabled: false };
   try {
-    pagesEnabled = await enablePages();
-  } catch {
-    /* PAT without Pages permission — user enables it manually */
+    pages = await enablePages();
+  } catch (err) {
+    pages = { enabled: false, error: String(err) };
   }
-  return { pagesEnabled };
+  return { pagesEnabled: pages.enabled, pagesStatus: pages.status ?? null };
 }
