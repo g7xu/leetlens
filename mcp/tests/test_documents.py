@@ -26,6 +26,11 @@ def test_search_ties_go_to_most_recent(records):
     assert hits[-1] == "tag:hash-map"
 
 
+def test_search_finds_a_problem_by_its_leetcode_topic(records):
+    # No session carries "depth-first-search" as a user tag; LeetCode does.
+    assert ids(documents.search_documents(records, "depth-first-search")) == ["0200-number-of-islands"]
+
+
 def test_search_matches_notes_and_tags(records):
     hits = documents.search_documents(records, "window")
     assert ids(hits) == ["0003-longest-substring-without-repeating-characters", "tag:sliding-window"]
@@ -60,9 +65,25 @@ def test_problem_document(records):
         "gave_up": 2,
         "solved": False,
         "tags": ["dp"],
+        "topics": ["array", "dynamic-programming", "breadth-first-search"],
         "last_session_at": "2026-08-20T10:00:00Z",
         "has_solution": True,
+        "attempts_with_code": [],
     }
+    assert "LeetCode topics: array, dynamic-programming" in text
+
+
+def test_problem_document_shows_each_attempt_s_own_code(records):
+    coin = [r for r in records if r["problem"]["dir_key"] == "0322-coin-change"]
+    sources = {coin[0]["session_id"]: "greedy = True", coin[1]["session_id"]: "dp = [0] * n"}
+    doc = documents.problem_document(coin, "newest", sources)
+    text = doc["text"]
+    # Each attempt's code sits under that attempt, in order, so the two can be compared.
+    assert text.index("greedy = True") < text.index("dp = [0] * n")
+    assert text.index("Attempt 1") < text.index("greedy = True") < text.index("Attempt 2")
+    # The canonical copy is redundant once every attempt is shown.
+    assert "newest" not in text
+    assert doc["metadata"]["attempts_with_code"] == sorted(sources)
 
 
 def test_problem_document_without_solution(records):

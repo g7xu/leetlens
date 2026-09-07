@@ -9,10 +9,14 @@ from __future__ import annotations
 import argparse
 import functools
 import json
+import re
+from collections import OrderedDict
 from typing import Annotated, Literal, get_type_hints
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.dependencies import get_http_request
+import httpx
 from pydantic import Field, TypeAdapter, ValidationError
 
 from . import documents, models, stats
@@ -29,6 +33,49 @@ mcp = FastMCP(
     ),
 )
 store = DataStore()
+
+# One hosted process serves any public data repo: the repo is named in the
+# URL (/{owner}/{repo}/mcp), so each request resolves its own store. Bounded
+# so a scan of random owner/repo pairs cannot grow the process without limit.
+REMOTE_STORE_LIMIT = 64
+REPO_SEGMENT = re.compile(r"^(?!\.\.?$)[A-Za-z0-9_.-]{1,100}$")
+_remote_stores: OrderedDict[str, DataStore] = OrderedDict()
+
+
+def make_remote_store(owner: str, repo: str) -> DataStore:
+    return DataStore(mode="github", repo=f"{owner}/{repo}", allow_tree_walk=False)
+
+
+def current_store() -> DataStore:
+    """The store for this call: per-repo when the request URL names one, else the process default."""
+    try:
+        params = get_http_request().path_params
+    except RuntimeError:  # stdio, or an HTTP app mounted without path parameters
+        return store
+    owner, repo = params.get("owner"), params.get("repo")
+    if not owner or not repo:
+        return store
+    if not (REPO_SEGMENT.match(owner) and REPO_SEGMENT.match(repo)):
+        raise ToolError(f"{owner}/{repo} is not a GitHub owner/repo pair")
+    key = f"{owner}/{repo}"
+    if key in _remote_stores:
+        _remote_stores.move_to_end(key)
+        return _remote_stores[key]
+    remote = make_remote_store(owner, repo)
+    _remote_stores[key] = remote
+    while len(_remote_stores) > REMOTE_STORE_LIMIT:
+        _, evicted = _remote_stores.popitem(last=False)
+        evicted.close()
+    return remote
+
+
+def load_sessions() -> list[dict]:
+    """Sessions for this call, with data-source failures named for the user."""
+    try:
+        return current_store().load_sessions()
+    except (RuntimeError, httpx.HTTPError, ValueError) as err:
+        raise ToolError(f"could not read the data repo: {err}") from err
+
 
 READ_ONLY = {
     "readOnlyHint": True,
@@ -70,6 +117,10 @@ TagFilter = Annotated[
     str | None,
     Field(description="Only sessions carrying this user tag, e.g. 'sliding-window'; list_tags shows the vocabulary"),
 ]
+LabelKind = Annotated[
+    Literal["tag", "topic"],
+    Field(description="Which vocabulary to rank: 'tag' is what the user typed themselves (may be sparse or absent), 'topic' is LeetCode's own, recorded for every problem"),
+]
 DateFrom = Annotated[str | None, Field(description="Earliest session date to include, YYYY-MM-DD, inclusive")]
 DateTo = Annotated[str | None, Field(description="Latest session date to include, YYYY-MM-DD, inclusive")]
 ProblemId = Annotated[
@@ -97,7 +148,7 @@ def list_sessions(
     notes) use export_sessions; for everything about one problem use
     get_problem_details.
     """
-    rows = [stats.session_summary(r) for r in store.load_sessions()]
+    rows = [stats.session_summary(r) for r in load_sessions()]
     if tag:
         rows = [r for r in rows if tag in r["tags"]]
     if difficulty:
@@ -112,11 +163,25 @@ def list_sessions(
     return rows[offset : offset + limit]
 
 
+def _attempt_sources(records: list[dict]) -> dict[str, str]:
+    """Each attempt's own committed code, keyed by session_id; skips ones with none."""
+    store_ = current_store()
+    out = {}
+    for rec in records:
+        path = (rec.get("solution") or {}).get("path")
+        if not path:
+            continue
+        source = store_.load_solution(rec["problem"]["dir_key"], path=path)
+        if source is not None:
+            out[rec["session_id"]] = source
+    return out
+
+
 def _problem_sessions(slug_or_id: str) -> list[dict]:
     """That problem's sessions, oldest first; matches slug, dir_key, or frontend id."""
     matches = [
         r
-        for r in store.load_sessions()
+        for r in load_sessions()
         if slug_or_id in (r["problem"]["slug"], r["problem"]["dir_key"], r["problem"]["frontend_id"])
     ]
     if not matches:
@@ -127,16 +192,19 @@ def _problem_sessions(slug_or_id: str) -> list[dict]:
 @tool("Problem details")
 def get_problem_details(slug_or_id: ProblemId) -> models.ProblemDetails:
     """Everything recorded about one problem: every attempt in full (phases,
-    run counts, logic idea, comments, tags) plus the committed solution source.
+    run counts, logic idea, comments, tags), the newest committed solution,
+    and each attempt's own code under attempt_sources.
 
-    Use this to explain why a specific problem went well or badly. fetch
+    Use this to explain why a specific problem went well or badly, including
+    what changed between a failed attempt and the one that worked. fetch
     returns the same material rendered as one readable document.
     """
     matches = _problem_sessions(slug_or_id)
     return {
         "problem": matches[0]["problem"],
         "sessions": matches,
-        "solution_source": store.load_solution(matches[0]["problem"]["dir_key"]),
+        "solution_source": current_store().load_solution(matches[0]["problem"]["dir_key"]),
+        "attempt_sources": _attempt_sources(matches),
     }
 
 
@@ -153,7 +221,7 @@ def search(
     Use this to locate something by name or topic. To search only the user's
     own notes and get the matching text back, use search_notes.
     """
-    return {"results": documents.search_documents(store.load_sessions(), query)}
+    return {"results": documents.search_documents(load_sessions(), query)}
 
 
 @tool("Fetch document")
@@ -164,26 +232,30 @@ def fetch(
     ],
 ) -> models.Document:
     """One self-contained document. For a problem: every attempt with phase
-    split, debugging share, runs, notes, then the committed solution. For a
-    tag: its aggregate stats and every session carrying it.
+    split, debugging share, runs, notes, and the code as it stood at the end of
+    that attempt. For a tag: its aggregate stats and every session carrying it.
 
     Use this after search, or whenever a readable write-up of one problem is
     more useful than the raw records from get_problem_details.
     """
     if id.startswith(documents.TAG_PREFIX):
-        doc = documents.tag_document(store.load_sessions(), id[len(documents.TAG_PREFIX):])
+        doc = documents.tag_document(load_sessions(), id[len(documents.TAG_PREFIX):])
         if doc is None:
             raise ToolError(f"no sessions carry tag {id!r}; list_tags shows the vocabulary")
         return doc
     matches = _problem_sessions(id)
-    return documents.problem_document(matches, store.load_solution(matches[0]["problem"]["dir_key"]))
+    return documents.problem_document(
+        matches,
+        current_store().load_solution(matches[0]["problem"]["dir_key"]),
+        _attempt_sources(matches),
+    )
 
 
 @tool("Grouped stats")
 def get_stats(
     group_by: Annotated[
-        Literal["tag", "difficulty", "week", "month"],
-        Field(description="What each group is: a user tag, a difficulty, an ISO week, or a calendar month"),
+        Literal["tag", "topic", "difficulty", "week", "month"],
+        Field(description="What each group is: a user tag, a LeetCode topic, a difficulty, an ISO week, or a calendar month"),
     ] = "tag",
 ) -> dict[str, models.GroupStats]:
     """Aggregate numbers per group: session and problem counts, give-up rate,
@@ -193,7 +265,7 @@ def get_stats(
     Use this for a table view. For a ranking of weak tags with the scoring
     exposed, use get_weak_areas; for change over time, get_trends.
     """
-    return stats.grouped_stats(store.load_sessions(), group_by)
+    return stats.grouped_stats(load_sessions(), group_by)
 
 
 @tool("Trends")
@@ -212,45 +284,50 @@ def get_trends(
     Use this to say whether the user is improving. For two specific periods
     side by side with deltas, use compare_periods.
     """
-    return stats.trends(store.load_sessions(), metric, window)
+    return stats.trends(load_sessions(), metric, window)
 
 
 @tool("Weak areas")
 def get_weak_areas(
     min_sessions: Annotated[
-        int, Field(description="Ignore tags with fewer sessions than this; guards against one bad day", ge=1)
+        int, Field(description="Ignore labels with fewer sessions than this; guards against one bad day", ge=1)
     ] = 2,
-    top_n: Annotated[int, Field(description="How many tags to return", ge=1)] = 5,
+    top_n: Annotated[int, Field(description="How many labels to return", ge=1)] = 5,
+    by: LabelKind = "topic",
 ) -> list[models.WeakArea]:
-    """Tags ranked weakest first. Score = 0.4*give_up_rate + 0.3*relative
-    slowness + 0.2*debugging share + 0.1*run-count factor; every component is
-    returned so the ranking can be explained, or re-weighted.
+    """Tags or topics ranked weakest first. Score = 0.4*give_up_rate +
+    0.3*relative slowness + 0.2*debugging share + 0.1*run-count factor; every
+    component is returned so the ranking can be explained, or re-weighted.
 
-    Use this as the starting point for a diagnosis. To compute a different
-    view of weakness from the raw data, use export_sessions.
+    Use this as the starting point for a diagnosis. Topics are the default
+    because LeetCode supplies them for every problem, so the ranking holds
+    even when the user tags nothing; pass by='tag' for their own vocabulary.
     """
-    return stats.weak_areas(store.load_sessions(), min_sessions, top_n)
+    return stats.weak_areas(load_sessions(), min_sessions, top_n, kind=by)
 
 
 @tool("List tags")
 def list_tags(
-    prefix: Annotated[str | None, Field(description="Only tags starting with this text")] = None,
+    prefix: Annotated[str | None, Field(description="Only labels starting with this text")] = None,
+    kind: LabelKind = "tag",
 ) -> list[models.TagUsage]:
-    """Every user-created tag with session and problem counts and the date it
-    was last practised. Tags are free text chosen by the user, so this is the
-    vocabulary to use in the tag filters of other tools.
+    """Every label of one kind with session and problem counts and the date it
+    was last practised. This is the vocabulary the tag filters of other tools
+    accept; an empty result for kind='tag' means the user tags nothing, and
+    kind='topic' is the vocabulary to use instead.
     """
     rows = [
         {
-            "tag": tag,
+            "label": label,
+            "kind": kind,
             "session_count": st["session_count"],
             "problem_count": st["problem_count"],
             "last_seen": st["last_seen"],
         }
-        for tag, st in stats.by_tag(store.load_sessions()).items()
+        for label, st in stats.by_label(load_sessions(), kind).items()
     ]
     if prefix:
-        rows = [r for r in rows if r["tag"].startswith(prefix)]
+        rows = [r for r in rows if r["label"].startswith(prefix)]
     return rows
 
 
@@ -259,17 +336,18 @@ def get_revenge_list() -> list[models.RevengeProblem]:
     """Problems the user gave up on and has not solved since, most recently
     tried first. The literal to-do list of unfinished fights.
     """
-    return stats.revenge_list(store.load_sessions())
+    return stats.revenge_list(load_sessions())
 
 
 @tool("Stale tags")
 def get_stale_tags(
-    days: Annotated[int, Field(description="A tag is stale when not practised for this many days", ge=1)] = 30,
+    days: Annotated[int, Field(description="A label is stale when not practised for this many days", ge=1)] = 30,
+    by: LabelKind = "topic",
 ) -> list[models.StaleTag]:
-    """Tags not practised recently, most stale first: the spaced-repetition
-    signal for what is about to be forgotten.
+    """Tags or topics not practised recently, most stale first: the
+    spaced-repetition signal for what is about to be forgotten.
     """
-    return stats.stale_tags(store.load_sessions(), days)
+    return stats.stale_tags(load_sessions(), days, kind=by)
 
 
 @tool("Recommend next")
@@ -282,7 +360,7 @@ def recommend_next(
 
     Use this to end a review with a plan.
     """
-    return stats.recommend_next(store.load_sessions(), count)
+    return stats.recommend_next(load_sessions(), count)
 
 
 @tool("Search notes")
@@ -296,7 +374,7 @@ def search_notes(
     Use this to find what the user wrote about an idea or a mistake. To find
     problems by title or tag as well, use search.
     """
-    return stats.search_notes(store.load_sessions(), query, limit)
+    return stats.search_notes(load_sessions(), query, limit)
 
 
 PeriodSpec = Annotated[
@@ -314,7 +392,7 @@ def compare_periods(period_a: PeriodSpec = "this_month", period_b: PeriodSpec = 
     get_trends.
     """
     try:
-        return stats.compare_periods(store.load_sessions(), period_a, period_b)
+        return stats.compare_periods(load_sessions(), period_a, period_b)
     except ValueError as err:
         raise ToolError(str(err)) from err
 
@@ -335,7 +413,7 @@ def export_sessions(
     Use this to run your own analysis instead of relying on the built-in
     scores, e.g. per-tag phase breakdowns or attempt-over-attempt comparisons.
     """
-    rows = stats.filter_records(store.load_sessions(), date_from, date_to, tag)
+    rows = stats.filter_records(load_sessions(), date_from, date_to, tag)
     rows = sorted(rows, key=lambda r: r["started_at"], reverse=True)
     if format == "json":
         return json.dumps(rows)
@@ -360,13 +438,16 @@ def weekly_review() -> str:
 @mcp.resource("leetlens://index", mime_type="application/json")
 def index_resource() -> str:
     """The aggregate index (totals, per-problem summaries, sessions, tags, daily activity)."""
-    return store.load_index_raw()
+    raw = current_store().load_index_raw()
+    if raw is None:
+        raise ToolError("this data repo has no data/index.json — set it up and push once")
+    return raw
 
 
 @mcp.resource("leetlens://sessions/{dir_key}", mime_type="application/json")
 def sessions_resource(dir_key: str) -> str:
     """Full session records for one problem, e.g. leetlens://sessions/0001-two-sum."""
-    records = [r for r in store.load_sessions() if r["problem"]["dir_key"] == dir_key]
+    records = [r for r in load_sessions() if r["problem"]["dir_key"] == dir_key]
     return json.dumps(records, indent=1)
 
 

@@ -20,7 +20,7 @@
     "tags"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "session_id": {
       "type": "string",
       "pattern": "^[a-z0-9]{8}$",
@@ -28,7 +28,7 @@
     },
     "problem": {
       "type": "object",
-      "required": ["frontend_id", "dir_key", "slug", "title", "difficulty", "url"],
+      "required": ["frontend_id", "dir_key", "slug", "title", "difficulty", "url", "topics"],
       "properties": {
         "frontend_id": { "type": "string", "description": "LeetCode question frontend id, e.g. \"2\"" },
         "dir_key": {
@@ -39,7 +39,12 @@
         "slug": { "type": "string", "description": "URL slug, e.g. add-two-numbers" },
         "title": { "type": "string", "description": "Display title, e.g. \"Add Two Numbers\"" },
         "difficulty": { "enum": ["Easy", "Medium", "Hard"] },
-        "url": { "type": "string", "format": "uri", "description": "Canonical problem URL" }
+        "url": { "type": "string", "format": "uri", "description": "Canonical problem URL" },
+        "topics": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "description": "LeetCode's own topic tags for this problem, e.g. [\"dynamic-programming\", \"array\"]. Recorded automatically, unlike the user-chosen `tags`; empty when LeetCode listed none."
+        }
       },
       "additionalProperties": false
     },
@@ -88,6 +93,16 @@
       "description": "User-created tags, kebab-case"
     },
     "comments": { "type": "string", "description": "Free-form notes entered on the save form" },
+    "solution": {
+      "type": "object",
+      "description": "The code as it stood at the end of this attempt. Absent when no code was captured (a give-up with no run). The canonical <dir_key>/<dir_key>.<ext> file always holds the newest attempt; `path` is this attempt's own copy, so earlier attempts survive.",
+      "required": ["path", "language"],
+      "properties": {
+        "path": { "type": "string", "description": "Repo-relative path, <dir_key>/attempts/<started_at>_<session_id>.<ext>" },
+        "language": { "type": "string", "description": "LeetCode language slug the code was written in" }
+      },
+      "additionalProperties": false
+    },
     "client": {
       "type": "object",
       "description": "Which client wrote this record; intentionally open for forward compatibility",

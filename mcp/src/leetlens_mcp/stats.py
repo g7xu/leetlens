@@ -8,6 +8,11 @@ from statistics import mean, median
 
 PHASES = ("thinking", "writing", "reviewing", "debugging")
 
+# Two vocabularies label a session. Tags are the user's own and may be absent
+# entirely; topics come from LeetCode and are recorded for every problem, so a
+# weakness ranking still works for someone who never tags anything.
+LABEL_KINDS = ("tag", "topic")
+
 
 def _date(rec: dict) -> str:
     return rec["started_at"][:10]
@@ -42,6 +47,7 @@ def session_summary(rec: dict) -> dict:
         "failed_run_count": rec["failed_run_count"],
         "submit_count": rec["submit_count"],
         "tags": rec.get("tags", []),
+        "topics": rec["problem"].get("topics", []),
     }
 
 
@@ -63,17 +69,32 @@ def _group_stats(records: list[dict]) -> dict:
     }
 
 
-def by_tag(records: list[dict]) -> dict[str, dict]:
+def labels_of(rec: dict, kind: str = "tag") -> list[str]:
+    if kind == "topic":
+        return rec["problem"].get("topics", [])
+    return rec.get("tags", [])
+
+
+def by_label(records: list[dict], kind: str = "tag") -> dict[str, dict]:
+    """Stats per label of `kind`; a session counts under each of its labels."""
     groups: dict[str, list[dict]] = defaultdict(list)
     for rec in records:
-        for tag in rec.get("tags", []):
-            groups[tag].append(rec)
-    return {tag: _group_stats(rs) for tag, rs in sorted(groups.items())}
+        for label in labels_of(rec, kind):
+            groups[label].append(rec)
+    return {label: _group_stats(rs) for label, rs in sorted(groups.items())}
+
+
+def by_tag(records: list[dict]) -> dict[str, dict]:
+    return by_label(records, "tag")
+
+
+def by_topic(records: list[dict]) -> dict[str, dict]:
+    return by_label(records, "topic")
 
 
 def grouped_stats(records: list[dict], group_by: str) -> dict[str, dict]:
-    if group_by == "tag":
-        return by_tag(records)
+    if group_by in LABEL_KINDS:
+        return by_label(records, group_by)
     key_fn = GROUP_KEYS[group_by]
     groups: dict[str, list[dict]] = defaultdict(list)
     for rec in records:
@@ -107,18 +128,20 @@ def trends(records: list[dict], metric: str, window: str = "week") -> list[dict]
     return out
 
 
-def weak_areas(records: list[dict], min_sessions: int = 2, top_n: int = 5) -> list[dict]:
-    """Score tags by give-up rate, relative slowness, debugging share, and run count.
+def weak_areas(
+    records: list[dict], min_sessions: int = 2, top_n: int = 5, kind: str = "tag"
+) -> list[dict]:
+    """Score labels by give-up rate, relative slowness, debugging share, and run count.
 
     Each component is normalized to 0..1; the returned breakdown lets an LLM
-    explain *why* a tag scored high instead of just trusting the number.
+    explain *why* a label scored high instead of just trusting the number.
     """
     if not records:
         return []
     global_median = median(r["total_active_sec"] for r in records) or 1
     global_runs = mean(r["run_count"] for r in records) or 1
     scored = []
-    for tag, st in by_tag(records).items():
+    for label, st in by_label(records, kind).items():
         if st["session_count"] < min_sessions:
             continue
         slowness = min(st["avg_total_sec"] / global_median, 2) / 2
@@ -129,7 +152,8 @@ def weak_areas(records: list[dict], min_sessions: int = 2, top_n: int = 5) -> li
         )
         scored.append(
             {
-                "tag": tag,
+                "label": label,
+                "kind": kind,
                 "score": round(score, 3),
                 "give_up_rate": st["give_up_rate"],
                 "avg_total_sec": st["avg_total_sec"],
@@ -167,6 +191,7 @@ def problem_summaries(records: list[dict]) -> list[dict]:
                 "last_session_at": rs[-1]["started_at"],
                 "best_total_sec": min((r["total_active_sec"] for r in accepted), default=None),
                 "tags": tags,
+                "topics": prob.get("topics", []),
             }
         )
     return out
@@ -194,25 +219,29 @@ def revenge_list(records: list[dict]) -> list[dict]:
                     "gave_up_count": sum(r["outcome"] == "gave_up" for r in rs),
                     "last_tried": _date(rs[-1]),
                     "tags": sorted({t for r in rs for t in r.get("tags", [])}),
+                    "topics": prob.get("topics", []),
                 }
             )
     out.sort(key=lambda r: r["last_tried"], reverse=True)
     return out
 
 
-def stale_tags(records: list[dict], days: int = 30, today: date | None = None) -> list[dict]:
-    """Tags not practiced in `days` days — the spaced-repetition signal."""
+def stale_tags(
+    records: list[dict], days: int = 30, today: date | None = None, kind: str = "tag"
+) -> list[dict]:
+    """Labels not practiced in `days` days — the spaced-repetition signal."""
     today = today or date.today()
     cutoff = (today - timedelta(days=days)).isoformat()
     out = [
         {
-            "tag": tag,
+            "label": label,
+            "kind": kind,
             "last_seen": st["last_seen"],
             "days_since": (today - date.fromisoformat(st["last_seen"])).days,
             "session_count": st["session_count"],
             "give_up_rate": st["give_up_rate"],
         }
-        for tag, st in by_tag(records).items()
+        for label, st in by_label(records, kind).items()
         if st["last_seen"] < cutoff
     ]
     out.sort(key=lambda r: r["last_seen"])
@@ -305,7 +334,13 @@ def compare_periods(
 
 
 def recommend_next(records: list[dict], count: int = 3, today: date | None = None) -> list[dict]:
-    """Concrete "solve this next" suggestions: revenge problems, weak tags, stale tags."""
+    """Concrete "solve this next" suggestions: revenge problems, weak labels, stale labels.
+
+    Ranks by user tags when there are enough of them and falls back to
+    LeetCode topics, so someone who never tags still gets weakness-driven
+    suggestions rather than only the revenge list.
+    """
+    kind = "tag" if len(by_tag(records)) >= 2 else "topic"
     revenge = [
         {
             "type": "revenge",
@@ -320,25 +355,25 @@ def recommend_next(records: list[dict], count: int = 3, today: date | None = Non
     ]
     weak = [
         {
-            "type": "weak_tag",
-            "action": f"Practice a fresh {w['tag']} problem",
-            "target": w["tag"],
+            "type": f"weak_{w['kind']}",
+            "action": f"Practice a fresh {w['label']} problem",
+            "target": w["label"],
             "reason": (
                 f"Weak area (score {w['score']}): {round(w['give_up_rate'] * 100)}% give-ups, "
                 f"{w['avg_total_sec']}s avg vs {w['global_median_sec']}s global median, "
                 f"{round(w['debugging_share'] * 100)}% of time debugging."
             ),
         }
-        for w in weak_areas(records, top_n=count)
+        for w in weak_areas(records, top_n=count, kind=kind)
     ]
     stale = [
         {
-            "type": "stale_tag",
-            "action": f"Refresh {s['tag']}",
-            "target": s["tag"],
+            "type": f"stale_{s['kind']}",
+            "action": f"Refresh {s['label']}",
+            "target": s["label"],
             "reason": f"Not practiced in {s['days_since']} days ({s['session_count']} past sessions).",
         }
-        for s in stale_tags(records, today=today)
+        for s in stale_tags(records, today=today, kind=kind)
     ]
     # Round-robin the three sources so one long list can't crowd out the others.
     suggestions: list[dict] = []

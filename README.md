@@ -6,15 +6,7 @@ LeetLens is a companion to [LeetHub-3.0](https://github.com/raphaelheinz/LeetHub
 
 Like LeetHub, this repo is only the tool. Your data lives in a repo you own — new, or your existing LeetHub repo (the layouts are compatible).
 
-## Components
-
-| Piece | Where | What it does |
-|---|---|---|
-| Chrome extension | `extension/` → `dist/` | Tracker panel on leetcode.com; commits sessions + solutions to *your* repo; one-click repo setup |
-| Your data repo | `<owner>/<your-repo>` | `data/sessions/<problem>/<timestamp>_<id>.json` per attempt, solutions in LeetHub layout, dashboard on its GitHub Pages |
-| MCP server | `mcp/` | Tools for LLMs: sessions, stats, trends, weak areas — pointed at your data repo |
-| Dashboard | `dashboard/` | Static site; your data repo's workflow deploys it with your data |
-| Session schema | `data/schema/session.schema.json` | The contract every component builds against |
+Four pieces: the Chrome extension (`extension/`), the MCP server (`mcp/`), the dashboard (`dashboard/`), and the session schema (`data/schema/`) they all build against. How they fit together is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Setup
 
@@ -33,13 +25,13 @@ Then `chrome://extensions` → enable Developer mode → **Load unpacked** → s
 
 > `dist/` is what Chrome loads; `extension/` holds the sources and has no manifest at its top level. If you previously loaded `extension/`, remove that entry first — Chrome keeps running the old copy otherwise.
 
-Prefer not to build? Recent [releases](https://github.com/g7xu/leetlens/releases) attach a ready-to-load `leetlens-<version>.zip` — download, unzip, and load that folder instead. (Releases before v1.1.0 predate the build and have no zip.)
+Prefer not to build? Every [release](https://github.com/g7xu/leetlens/releases) attaches a ready-to-load `leetlens-<version>.zip` — download, unzip, and load that folder instead.
 
 ### 2. Create (or pick) your data repo
 
 Any repo works: create an empty one (e.g. `leetcode-journal`), or reuse an existing LeetHub repo — LeetLens writes sessions to `data/sessions/` and solutions to the same `<id>-<slug>/` folders LeetHub uses.
 
-> GitHub Pages requires a public repo on free plans.
+> GitHub Pages requires a public repo on free plans. A public data repo makes everything in it public: your sessions, your solutions, and whatever you write in the thinking area. A private repo works too, but loses the dashboard and the hosted MCP server.
 
 ### 3. Create a fine-grained personal access token
 
@@ -62,7 +54,9 @@ That's it. Open any LeetCode problem — the LeetLens panel appears, a *thinking
 
 Write as much as you like in the thinking area: it's a block comment, so it never affects your code, time spent there counts as *thinking* rather than *writing*, and its text is read when you finish and used to fill in the session's logic idea. It's stripped from the solution file that gets committed. Languages with no block-comment syntax (Erlang, Elixir, Bash) don't get one — use the logic-idea box on the save form instead.
 
-Your data repo's workflow pins the LeetLens toolchain with `LEETLENS_REF: v1` — a moving major tag that picks up compatible improvements automatically. Pin an exact release tag in your workflow file if you prefer reproducibility.
+Your data repo's workflow pins the LeetLens toolchain with `LEETLENS_REF: v2`, a moving major tag; pin an exact release tag instead if you prefer reproducibility. The tag policy is in [ARCHITECTURE.md](ARCHITECTURE.md#the-two-repo-model).
+
+> **Upgrading from `v1`.** Sessions now record LeetCode's own topic tags (so weak-area analysis works even if you never tag anything yourself) and keep a copy of the code from every attempt, not just the last one. Change `LEETLENS_REF: v1` to `v2` in your data repo's `.github/workflows/publish.yml` and push; old sessions keep working, they just have no topics. Staying on `v1` is fine — v1 ignores the new fields.
 
 ### 5. MCP server (Claude Code / Claude Desktop / ChatGPT)
 
@@ -87,14 +81,18 @@ Claude Desktop (`claude_desktop_config.json`):
 }
 ```
 
-To run without a clone (e.g. remote/ChatGPT), fetch straight from GitHub over streamable HTTP:
+**No install at all: the hosted server.** One public endpoint serves any public data repo; put your owner and repo in the URL:
 
 ```bash
-LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> \
-  uv run --directory mcp leetlens-mcp --transport streamable-http --port 8765
+claude mcp add --transport http leetlens https://leetlens-mcp.vercel.app/<owner>/<your-data-repo>/mcp
 ```
 
-and add it as a connector in ChatGPT → Settings → Connectors (developer mode), e.g. through an `ngrok http 8765` tunnel. The `search` / `fetch` pair follows ChatGPT's connector contract, so deep research can use the server too. Private data repo? Also set `LCP_GITHUB_TOKEN` (the same fine-grained PAT works — Contents: read is enough), which switches fetching from raw.githubusercontent.com to the authenticated Contents API.
+The same URL works as a custom connector in Claude.ai (Settings → Connectors) and in ChatGPT (Settings → Connectors, developer mode); the `search` / `fetch` pair follows ChatGPT's connector contract, so deep research can use it too. The server reads your repo's generated `data/index.json`, so the repo must be public and set up with the extension (one push after **Set up repo** is enough). Private data repo? Run the server yourself against a local clone (above) or fetch from GitHub with a token:
+
+```bash
+LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> LCP_GITHUB_TOKEN=<fine-grained PAT, Contents: read> \
+  uv run --directory mcp leetlens-mcp --transport http --port 8765
+```
 
 <details>
 <summary><b>Reference: tools, prompt, resources, env vars</b></summary>
@@ -130,7 +128,7 @@ Plus the `weekly_review` prompt and two resources: `leetlens://index` and `leetl
 
 ## Data model
 
-Each session file records: problem metadata, `started_at`/`ended_at`, ordered phase segments (`thinking|writing|reviewing|debugging`, each `auto` or `manual`), per-phase totals, `run_count` / `failed_run_count` / `submit_count`, `outcome` (`accepted` / `gave_up` / `abandoned`), `logic_idea`, `tags`, `comments`. See `data/schema/session.schema.json` — the schema is the contract for every component.
+One JSON file per attempt, described field by field in [`data/schema/session.schema.json`](data/schema/session.schema.json).
 
 ## Development
 
@@ -145,7 +143,15 @@ python3 -m http.server -d /path/to/your-data-repo 8000
 # then copy dashboard/* next to that data, or open the deployed Pages site
 ```
 
-Contributions welcome — the extension is plain MV3 JavaScript bundled with esbuild, the MCP server is a small uv project, and the dashboard is a static page. Start with [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit and why, then [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the sharp edges.
+Contributions welcome: [CONTRIBUTING.md](CONTRIBUTING.md) has the workflow and the sharp edges.
+
+## Privacy
+
+LeetLens has no server and collects nothing. Sessions and solutions go from your browser to the GitHub repository you nominate, using your own credential; that credential and your in-progress session are stored in your browser profile's extension storage. The only hosts contacted are `leetcode.com` (the problem you are solving), `api.github.com` (your repo), and `github.com/login` (signing in).
+
+The hosted analysis server reads your data repo the same way anyone can — it is public — and stores nothing.
+
+**A public data repo is public.** Your sessions, your solutions, and anything you write in the thinking area are visible to anyone. A private repo keeps them to you but loses the dashboard and the hosted server; the MCP server still works locally against a clone.
 
 ## License
 

@@ -1,0 +1,38 @@
+name: release
+
+# The zip is how people install the extension outside the Web Store, so a
+# release without one leaves them no way to get it — which is what happened
+# with v1.0.0. Tagging is now the only manual step.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build and package
+        run: npm run zip
+
+      - name: Attach the zip to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        # The tag may have been pushed before any release exists, or by a
+        # maintainer who drafted release notes first; create only if absent.
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --title "$TAG" --generate-notes
+          gh release upload "$TAG" leetlens-*.zip --clobber

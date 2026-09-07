@@ -117,10 +117,13 @@ function solveTrend(rows, t) {
   });
 }
 
+// Grouped by whichever vocabulary the dashboard ranks by (see rankingKind in
+// app.js): a chart of user tags is empty for someone who never tags.
 function tagStats(rows) {
+  const kind = new Set(rows.flatMap((s) => s.tags)).size >= 2 ? 'tags' : 'topics';
   const byTag = {};
   for (const s of rows) {
-    for (const tag of s.tags) (byTag[tag] ??= []).push(s);
+    for (const tag of s[kind] ?? []) (byTag[tag] ??= []).push(s);
   }
   return Object.entries(byTag).map(([tag, list]) => {
     const phaseAvg = {};

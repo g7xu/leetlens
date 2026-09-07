@@ -38,28 +38,25 @@ jobs:
           node -e "
           const fs = require('node:fs');
           const m = JSON.parse(fs.readFileSync('dist/manifest.json', 'utf8'));
-          const refs = [m.background.service_worker, ...m.content_scripts.flatMap(c => c.js), m.options_page];
+          const refs = [
+            m.background.service_worker,
+            ...m.content_scripts.flatMap(c => c.js),
+            m.options_page,
+            ...Object.values(m.icons ?? {}),
+            ...Object.values(m.action?.default_icon ?? {}),
+          ];
           const missing = refs.filter((r) => !fs.existsSync('dist/' + r));
           if (missing.length) throw new Error('manifest references missing files: ' + missing);
           console.log('manifest references all resolve');
           "
 
-      - name: Validate the embedded data-repo workflow
-        # The workflow users receive lives as a template literal in
-        # repo-setup.js — a typo there is invisible until it lands in
-        # someone's data repo, so evaluate the literal and parse the YAML.
-        # This reads SOURCE on purpose: the text surgery below would silently
-        # mangle a bundled file, where esbuild may rename WORKFLOW_YML.
+      - name: Validate the embedded data-repo templates
+        # The files users receive live as template literals in repo-setup.js —
+        # a typo there is invisible until it lands in someone's data repo.
+        # test/repo-setup.test.mjs checks the JSON ones; YAML needs a parser
+        # this repo does not ship, so the workflow is checked here.
         run: |
-          node --input-type=module -e "
-          import { readFileSync, writeFileSync } from 'node:fs';
-          const src = readFileSync('extension/src/lib/repo-setup.js', 'utf8')
-            .replace(/^import .*$/m, '')
-            .replace('const WORKFLOW_YML', 'export const WORKFLOW_YML');
-          writeFileSync('/tmp/repo-setup-extract.mjs', src);
-          const m = await import('/tmp/repo-setup-extract.mjs');
-          writeFileSync('/tmp/embedded-publish.yml', m.WORKFLOW_YML);
-          "
+          node -e "import('./extension/src/lib/repo-setup.js').then(m => process.stdout.write(m.WORKFLOW_YML))" > /tmp/embedded-publish.yml
           python3 -m pip install --quiet pyyaml
           python3 -c "
           import yaml

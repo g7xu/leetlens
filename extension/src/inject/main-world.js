@@ -1,25 +1,21 @@
 // Runs in the page's MAIN world at document_start. Observes LeetCode's own
 // network traffic (never blocks or modifies it) and reports events to the
 // content script via window.postMessage. Holds no state beyond pending ids.
-//
-// Chrome loads this as a *classic* script and gives it no chrome.* APIs, so it
-// can neither `import` nor reach for chrome.runtime.getURL. The build bundles
-// it into one self-contained IIFE (see build.mjs); nothing may remain in the
-// output that the browser would have to resolve at runtime.
+// No chrome.* here and no runtime imports: the build inlines everything.
+
+import { CHECK_URL, RUN_URL, SUBMIT_URL, slugFromPath, storedLanguage } from '../lib/leetcode-endpoints.js';
+import { EVENT_SOURCE, REQUEST_SOURCE } from '../lib/messages.js';
+import { THINK_HEADER_RE, lineInThinkingArea, thinkingBlock } from '../lib/thinking-area.js';
+
 (() => {
   'use strict';
-
-  const SOURCE = 'leetlens';
-  const RUN_URL = /\/problems\/[^/]+\/interpret_solution\/?/;
-  const SUBMIT_URL = /\/problems\/[^/]+\/submit\/?/;
-  const CHECK_URL = /\/submissions\/detail\/([^/]+)\/check\/?/;
 
   const pendingRuns = new Set();
   const pendingSubmits = new Set();
   const reportedChecks = new Set();
 
   function emit(type, payload = {}) {
-    window.postMessage({ source: SOURCE, type, payload }, window.location.origin);
+    window.postMessage({ source: EVENT_SOURCE, type, payload }, window.location.origin);
   }
 
   // Run/submit request bodies carry the editor contents as typed_code — the
@@ -58,22 +54,18 @@
     }
   }
 
-  async function inspect(url, response, requestBody) {
-    try {
-      if (RUN_URL.test(url)) {
-        const data = await response.clone().json();
-        if (data.interpret_id) pendingRuns.add(data.interpret_id);
-        emit('RUN_STARTED', codeFromBody(requestBody));
-      } else if (SUBMIT_URL.test(url)) {
-        const data = await response.clone().json();
-        if (data.submission_id) pendingSubmits.add(String(data.submission_id));
-        emit('SUBMIT_STARTED', codeFromBody(requestBody));
-      } else {
-        const m = url.match(CHECK_URL);
-        if (m) handleCheckResponse(m[1], await response.clone().json());
-      }
-    } catch {
-      /* never let observation break the page */
+  // Shared by the fetch and XHR hooks: `data` is the parsed response body.
+  function observe(url, data, requestBody) {
+    if (!data || typeof data !== 'object') return;
+    if (RUN_URL.test(url)) {
+      if (data.interpret_id) pendingRuns.add(data.interpret_id);
+      emit('RUN_STARTED', codeFromBody(requestBody));
+    } else if (SUBMIT_URL.test(url)) {
+      if (data.submission_id) pendingSubmits.add(String(data.submission_id));
+      emit('SUBMIT_STARTED', codeFromBody(requestBody));
+    } else {
+      const m = url.match(CHECK_URL);
+      if (m) handleCheckResponse(m[1], data);
     }
   }
 
@@ -81,7 +73,13 @@
   window.fetch = async function (...args) {
     const response = await originalFetch.apply(this, args);
     const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
-    if (url) inspect(url, response, args[1]?.body);
+    if (url && (RUN_URL.test(url) || SUBMIT_URL.test(url) || CHECK_URL.test(url))) {
+      // Detached from the response the page is awaiting, so nothing here can
+      // delay or break it. A body that is not the JSON we expect is skipped.
+      response.clone().json()
+        .then((data) => observe(url, data, args[1]?.body))
+        .catch((err) => console.debug('LeetLens: skipped a response', err));
+    }
     return response;
   };
 
@@ -95,66 +93,24 @@
     const requestBody = args[0];
     this.addEventListener('load', () => {
       const url = this.__leetlensUrl;
-      if (!url) return;
+      if (!url || !(RUN_URL.test(url) || SUBMIT_URL.test(url) || CHECK_URL.test(url))) return;
+      let data;
       try {
-        if (RUN_URL.test(url)) {
-          const data = JSON.parse(this.responseText);
-          if (data.interpret_id) pendingRuns.add(data.interpret_id);
-          emit('RUN_STARTED', codeFromBody(requestBody));
-        } else if (SUBMIT_URL.test(url)) {
-          const data = JSON.parse(this.responseText);
-          if (data.submission_id) pendingSubmits.add(String(data.submission_id));
-          emit('SUBMIT_STARTED', codeFromBody(requestBody));
-        } else {
-          const m = url.match(CHECK_URL);
-          if (m) handleCheckResponse(m[1], JSON.parse(this.responseText));
-        }
+        data = JSON.parse(this.responseText); // responseText throws for blob/arraybuffer
       } catch {
-        /* ignore */
+        return;
       }
+      observe(url, data, requestBody);
     });
     return originalSend.apply(this, args);
   };
 
   // -- thinking area -----------------------------------------------------
-  // Prepend a comment block to the top of the code editor so the approach
-  // gets sketched where the user already is — in the editor — before coding.
-  // The content script later strips this block from the captured code and
-  // turns it into the session's logic-idea draft.
-  //
-  // It must be a *block* comment. Monaco does not re-insert a line-comment
-  // token when the user presses Enter, so a `#`-prefixed region only protects
-  // the lines we pre-write — the next line of notes would be parsed as code.
-  //
-  // LeetCode registers Monaco languages under its own slugs (model
-  // .getLanguageId() returns 'python3', 'golang', 'oraclesql', …), so match
-  // those — not Monaco's standard ids.
-  function blockDelimiters(langId) {
-    // r-string: notes containing \d or a Windows path would otherwise raise
-    // SyntaxWarning on Python 3.12+.
-    if (['python', 'python3', 'pythondata'].includes(langId)) return ['r"""', '"""'];
-    if (langId === 'ruby') return ['=begin', '=end']; // must stay at column 0
-    if (langId === 'racket') return ['#|', '|#'];
-    // No block-comment form exists in these, and a region that breaks the
-    // moment you press Enter is worse than none — those users still have the
-    // logic-idea box on the save form.
-    if (['erlang', 'elixir', 'bash', 'shell'].includes(langId)) return null;
-    return ['/*', '*/']; // C family, and every SQL dialect LeetCode offers
-  }
-
-  // Must accept every opener blockDelimiters can write, or a block restored by
-  // LeetCode's cloud save goes unrecognised and a second one is prepended on
-  // every reload. Mirrors THINK_HEADER_RE in src/lib/leetcode-endpoints.js —
-  // keep the two in sync; test/thinking-area.test.mjs pins the shapes.
-  const THINK_HEADER_RE =
-    /^[ \t]*(?:r?"""|'''|\/\*|=begin|#\||#|\/\/|--|;|%)[ \t]*Thinking area\b/im;
+  // A comment block prepended to the editor for sketching the approach; the
+  // content script strips it from captured code and keeps the text as the
+  // logic-idea draft (src/lib/thinking-area.js owns the format).
   const NON_CODE_LANGS = new Set(['plaintext', 'json', 'markdown']);
   const injectedKeys = new Set();
-
-  function thinkingBlock(langId) {
-    const block = blockDelimiters(langId);
-    return block && `${block[0]} Thinking area\n\n\n\n${block[1]}\n\n`;
-  }
 
   /**
    * The model the user is actually solving in. getModels() also returns the
@@ -183,20 +139,14 @@
     if (focused && usable.includes(focused)) return focused;
     const writableModel = writable.map((e) => e.getModel?.()).find((m) => usable.includes(m));
     if (writableModel) return writableModel;
-    // LeetCode's own record of the selected editor language; localStorage is
-    // shared across worlds on this origin.
-    try {
-      const selected = JSON.parse(window.localStorage.getItem('global_lang') ?? '""');
-      const byLang = usable.find((m) => m.getLanguageId?.() === selected);
-      if (byLang) return byLang;
-    } catch {
-      /* fall through */
-    }
+    const selected = storedLanguage();
+    const byLang = selected && usable.find((m) => m.getLanguageId?.() === selected);
+    if (byLang) return byLang;
     return usable.find((m) => THINK_HEADER_RE.test(m.getValue())) ?? usable[0];
   }
 
   function ensureThinkingArea() {
-    const slug = (window.location.pathname.match(/^\/problems\/([^/]+)/) || [])[1];
+    const slug = slugFromPath(window.location.pathname);
     if (!slug) return;
     try {
       const model = pickEditorModel();
@@ -233,17 +183,9 @@
       const editor = (window.monaco?.editor?.getEditors?.() ?? [])
         .find((e) => e.hasTextFocus?.());
       const model = editor?.getModel?.();
-      const line = editor?.getPosition?.()?.lineNumber;
+      const line = editor?.getPosition?.()?.lineNumber; // 1-based
       if (!model || !line) return false;
-      const lines = model.getValue().split('\n');
-      let head = 0;
-      while (head < lines.length && !lines[head].trim()) head++;
-      if (!THINK_HEADER_RE.test(lines[head] ?? '')) return false;
-      const block = blockDelimiters(model.getLanguageId?.());
-      if (!block) return false;
-      const close = lines.findIndex((l, i) => i > head && l.trim() === block[1]);
-      // lineNumber is 1-based; head/close are 0-based indices.
-      return close !== -1 && line - 1 >= head && line - 1 <= close;
+      return lineInThinkingArea(model.getValue(), line - 1, model.getLanguageId?.());
     } catch {
       return false;
     }
@@ -256,7 +198,7 @@
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.origin !== window.location.origin) return;
     const { source, type, id } = event.data ?? {};
-    if (source !== `${SOURCE}-req` || type !== 'GET_EDITOR_CODE') return;
+    if (source !== REQUEST_SOURCE || type !== 'GET_EDITOR_CODE') return;
     let payload = { id, code: null, lang: null, cursorInNotes: false };
     try {
       const model = pickEditorModel();

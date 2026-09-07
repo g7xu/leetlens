@@ -43,10 +43,16 @@ const fmtMin = (sec) => `${Math.round(sec / 60)}m`;
 
 // -- filtering ---------------------------------------------------------
 
+// A filter value is "<kind>:<label>", since a user tag and a LeetCode topic
+// can share a name and mean different things.
+function labelsOf(session, kind) {
+  return kind === 'topic' ? (session.topics ?? []) : session.tags;
+}
+
 function applyFilters(sessions) {
   const range = $('rangeFilter').value;
   const difficulty = $('difficultyFilter').value;
-  const tag = $('tagFilter').value;
+  const [labelKind, label] = $('tagFilter').value.split(/:(.*)/s);
   let rows = sessions;
   if (range !== 'all') {
     const cutoff = new Date(Date.now() - Number(range) * 86400_000)
@@ -54,7 +60,7 @@ function applyFilters(sessions) {
     rows = rows.filter((s) => s.date >= cutoff);
   }
   if (difficulty) rows = rows.filter((s) => s.difficulty === difficulty);
-  if (tag) rows = rows.filter((s) => s.tags.includes(tag));
+  if (label) rows = rows.filter((s) => labelsOf(s, labelKind).includes(label));
   return rows;
 }
 
@@ -93,16 +99,23 @@ function renderTiles(rows) {
 }
 
 // -- weak areas --------------------------------------------------------
-// Same formula as the MCP server's get_weak_areas tool (mcp/…/stats.py), so
-// the dashboard and Claude tell the same story:
+// Same formula and the same choice of vocabulary as the MCP server's
+// get_weak_areas tool (mcp/…/stats.py), so the dashboard and Claude tell the
+// same story:
 //   score = 0.4*give_up_rate + 0.3*slowness + 0.2*debugging share + 0.1*run factor
 
-function weakAreas(rows, minSessions = 2, topN = 5) {
+/** User tags when there are enough to rank, else LeetCode's topics. */
+function rankingKind(rows) {
+  const tags = new Set(rows.flatMap((s) => s.tags));
+  return tags.size >= 2 ? 'tag' : 'topic';
+}
+
+function weakAreas(rows, minSessions = 2, topN = 5, kind = rankingKind(rows)) {
   if (!rows.length) return [];
   const globalMedian = median(rows.map((s) => s.total_active_sec)) || 1;
   const globalRuns = rows.reduce((sum, s) => sum + s.run_count, 0) / rows.length || 1;
   const byTag = {};
-  for (const s of rows) for (const tag of s.tags) (byTag[tag] ??= []).push(s);
+  for (const s of rows) for (const tag of labelsOf(s, kind)) (byTag[tag] ??= []).push(s);
   return Object.entries(byTag)
     .filter(([, list]) => list.length >= minSessions)
     .map(([tag, list]) => {
@@ -136,7 +149,7 @@ function renderWeakAreas(rows) {
   if (!areas.length) {
     const p = document.createElement('p');
     p.className = 'muted';
-    p.textContent = 'Not enough tagged sessions yet (needs 2+ sessions per tag).';
+    p.textContent = 'Not enough sessions yet (needs 2+ on the same tag or topic).';
     container.replaceChildren(p);
     return;
   }
@@ -279,6 +292,22 @@ function render() {
   buildCharts(rows, t);
 }
 
+/** Two optgroups: the user's own tags, then LeetCode's topics. */
+function fillLabelFilter(idx) {
+  const filter = $('tagFilter');
+  for (const [kind, label, source] of [
+    ['tag', 'Your tags', idx.tags],
+    ['topic', 'LeetCode topics', idx.topics],
+  ]) {
+    const names = Object.keys(source ?? {}).sort();
+    if (!names.length) continue;
+    const group = document.createElement('optgroup');
+    group.label = label;
+    group.append(...names.map((name) => new Option(name, `${kind}:${name}`)));
+    filter.append(group);
+  }
+}
+
 (async () => {
   try {
     index = await loadIndex();
@@ -291,8 +320,7 @@ function render() {
   }
   $('generatedAt').textContent = `updated ${index.generated_at.slice(0, 10)}`;
   slugByDirKey = Object.fromEntries(index.problems.map((p) => [p.dir_key, p.slug]));
-  const tags = Object.keys(index.tags).sort();
-  $('tagFilter').append(...tags.map((tag) => new Option(tag, tag)));
+  fillLabelFilter(index);
   for (const id of ['rangeFilter', 'difficultyFilter', 'tagFilter']) {
     $(id).addEventListener('change', render);
   }

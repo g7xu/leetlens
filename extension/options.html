@@ -7,10 +7,22 @@
     body {
       font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
       background: #14171c; color: #e8eaed; max-width: 560px;
-      margin: 40px auto; padding: 0 20px; font-size: 14px; line-height: 1.5;
+      margin: 40px auto; padding: 0 20px 60px; font-size: 14px; line-height: 1.5;
     }
-    h1 { font-size: 20px; }
-    label { display: block; margin: 16px 0 4px; color: #9aa3b2; font-size: 12px;
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    h2 { font-size: 15px; margin: 0; display: flex; align-items: center; gap: 9px; }
+    .num {
+      display: inline-grid; place-items: center; width: 22px; height: 22px; flex: none;
+      border-radius: 50%; background: #262b34; color: #9aa3b2; font-size: 12px; font-weight: 700;
+    }
+    .step { border: 1px solid #333a45; border-radius: 10px; padding: 16px 18px; margin-top: 14px; }
+    .step[data-state="done"] .num { background: #2f6b46; color: #fff; }
+    .step[data-state="active"] { border-color: #4a5568; }
+    .step[data-state="active"] .num { background: #7aa2ff; color: #14171c; }
+    .step-body { margin-top: 14px; }
+    .step[data-state="done"] .step-body { display: none; }
+    .summary { color: #9aa3b2; font-size: 13px; margin-left: auto; }
+    label { display: block; margin: 14px 0 4px; color: #9aa3b2; font-size: 12px;
             text-transform: uppercase; letter-spacing: .5px; }
     input {
       width: 100%; box-sizing: border-box; background: #1c1f26; color: #e8eaed;
@@ -20,53 +32,102 @@
     .row { display: flex; gap: 10px; }
     .row > div { flex: 1; }
     button {
-      margin-top: 20px; margin-right: 8px; padding: 9px 18px; border-radius: 8px;
+      margin-top: 14px; margin-right: 8px; padding: 9px 18px; border-radius: 8px;
       border: none; cursor: pointer; font-weight: 600; font-size: 13px;
       background: #2f6b46; color: #fff;
     }
     button.secondary { background: #262b34; color: #c7cdd6; border: 1px solid #333a45; }
-    #status { margin-top: 14px; min-height: 20px; }
-    .ok { color: #8fd9a8; } .err { color: #f2a0a8; }
-    .help { color: #9aa3b2; font-size: 13px; background: #1c1f26; border: 1px solid #333a45;
-            border-radius: 8px; padding: 12px 14px; margin-top: 24px; }
-    .help a { color: #9db8ff; }
-    code { background: #262b34; padding: 1px 5px; border-radius: 4px; }
+    button.link { background: none; border: none; color: #9db8ff; padding: 0; margin: 12px 0 0;
+                  font-weight: 400; text-decoration: underline; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    .status { margin-top: 12px; min-height: 20px; font-size: 13px; }
+    .ok { color: #8fd9a8; } .err { color: #f2a0a8; } .muted { color: #9aa3b2; }
+    a { color: #9db8ff; }
+    code, pre {
+      background: #1c1f26; border: 1px solid #333a45; border-radius: 6px;
+      font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    code { padding: 1px 5px; }
+    pre { padding: 10px 12px; overflow-x: auto; margin: 8px 0 0; }
+    .code-big { font-size: 26px; letter-spacing: 4px; font-weight: 700; color: #e8eaed;
+                background: #1c1f26; border: 1px solid #333a45; border-radius: 8px;
+                padding: 12px; text-align: center; margin: 12px 0; font-family: ui-monospace, monospace; }
+    footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #262b34; color: #9aa3b2; }
   </style>
 </head>
 <body>
   <h1>🔍 LeetLens</h1>
-  <p>Sessions are committed to <code>data/sessions/</code> in the repo below.</p>
+  <p class="muted">Three steps, once. Then every LeetCode session you finish is committed to your own repo.</p>
 
-  <div class="row">
-    <div><label for="owner">GitHub owner</label><input id="owner" placeholder="your-github-username"></div>
-    <div><label for="repo">Repository</label><input id="repo" placeholder="leetcode-journal"></div>
-    <div><label for="branch">Branch</label><input id="branch" placeholder="main"></div>
-  </div>
-  <label for="token">Fine-grained personal access token</label>
-  <input id="token" type="password" placeholder="github_pat_…">
+  <section class="step" id="step1" data-state="active">
+    <h2><span class="num">1</span> Connect GitHub <span class="summary" id="summary1"></span></h2>
+    <div class="step-body">
+      <div id="signinBlock" hidden>
+        <p class="muted">LeetLens opens github.com, you type the code below, and that is it. No token to create.</p>
+        <button id="signin">Sign in with GitHub</button>
+        <div id="deviceCode" hidden>
+          <div class="code-big" id="userCode"></div>
+          <p class="muted">Type it at <a id="verifyLink" href="https://github.com/login/device" target="_blank">github.com/login/device</a>, then come back here.</p>
+        </div>
+        <button class="link" id="useToken">Use a personal access token instead</button>
+      </div>
+      <div id="tokenBlock" hidden>
+        <label for="token">Fine-grained personal access token</label>
+        <input id="token" type="password" placeholder="github_pat_…">
+        <p class="muted">Needs <b>Contents</b> and <b>Workflows</b> (Read and write) on your data repo,
+          and optionally <b>Pages</b>. Create one under GitHub →
+          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">Fine-grained tokens</a>.
+          It is stored in this browser profile.</p>
+        <button id="saveToken">Save token</button>
+        <button class="link" id="useSignin" hidden>Sign in with GitHub instead</button>
+      </div>
+      <div class="status" id="status1"></div>
+    </div>
+  </section>
 
-  <button id="save">Save</button>
-  <button id="test" class="secondary">Test connection</button>
-  <button id="setup" class="secondary">Set up repo for LeetLens</button>
-  <button id="flush" class="secondary">Retry queued commits (<span id="queueCount">0</span>)</button>
-  <div id="status"></div>
+  <section class="step" id="step2" data-state="">
+    <h2><span class="num">2</span> Choose the repo <span class="summary" id="summary2"></span></h2>
+    <div class="step-body">
+      <p class="muted">Any repo works: a fresh one, or your existing LeetHub repo.
+        <a href="https://github.com/new" target="_blank">Create one</a> if you need to.
+        Public is required for the dashboard and the hosted analysis server.</p>
+      <div class="row">
+        <div><label for="owner">Owner</label><input id="owner" placeholder="your-username"></div>
+        <div><label for="repo">Repository</label><input id="repo" placeholder="leetcode-journal"></div>
+        <div><label for="branch">Branch</label><input id="branch" placeholder="main"></div>
+      </div>
+      <button id="test">Test connection</button>
+      <p class="muted" id="installHint" hidden>Signed in with the GitHub App? It reaches only repos you install it on —
+        <a id="installLink" href="https://github.com/settings/installations" target="_blank">install LeetLens on this repo</a>.</p>
+      <div class="status" id="status2"></div>
+    </div>
+  </section>
 
-  <div class="help">
-    <b>Creating the token:</b> GitHub → Settings → Developer settings →
-    <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">
-    Fine-grained tokens</a> → Repository access: <i>only your practice repo</i> →
-    Permissions: <b>Contents — Read and write</b>. Nothing else. The token is stored
-    in this browser profile's extension storage; anyone with access to this machine
-    profile could read it, which is why it should be scoped to this one repo.
-  </div>
+  <section class="step" id="step3" data-state="">
+    <h2><span class="num">3</span> Set up the repo <span class="summary" id="summary3"></span></h2>
+    <div class="step-body">
+      <p class="muted">Commits the dashboard workflow, the sessions folder, and the files that let
+        Claude Code or Codex analyse your practice from inside the repo.</p>
+      <button id="setup">Set up repo for LeetLens</button>
+      <div class="status" id="status3"></div>
+    </div>
+  </section>
 
-  <div class="help">
-    <b>Set up repo</b> turns the repo above into a LeetLens data repo: it commits
-    the dashboard workflow and the sessions folder. Works on an empty repo or an
-    existing one (e.g. your LeetHub repo). If the button can't enable GitHub Pages
-    for you (that needs the optional <b>Pages — Read and write</b> token permission),
-    finish with one manual step: repo <i>Settings → Pages → Source: GitHub Actions</i>.
-  </div>
+  <section id="done" hidden>
+    <h2>You're set 🎉</h2>
+    <p>Open any LeetCode problem — the panel appears, and <b>Finish → Save to GitHub</b> commits the session.</p>
+    <p class="muted">Your dashboard (after the first save):<br><a id="dashLink" href="#" target="_blank"></a></p>
+    <p class="muted">Analyse your practice with Claude or ChatGPT — add this connector URL:</p>
+    <pre id="mcpUrl"></pre>
+    <p class="muted">Or in a terminal:</p>
+    <pre id="mcpCli"></pre>
+  </section>
+
+  <footer>
+    <button class="secondary" id="flush">Retry queued commits (<span id="queueCount">0</span>)</button>
+    <button class="link" id="signout" hidden>Disconnect GitHub</button>
+    <div class="status" id="statusFooter"></div>
+  </footer>
 
   <script src="options.js" type="module"></script>
 </body>
