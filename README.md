@@ -42,13 +42,12 @@ Create one at [Settings → Fine-grained tokens](https://github.com/settings/per
 |---|---|---|
 | Contents | Read and write | Committing your sessions and solutions |
 | Workflows | Read and write | Step 4 commits a workflow file, which GitHub gates separately |
-| Pages | Read and write | Lets step 4 turn on your dashboard for you |
 
 Metadata is added automatically; leave everything else at No access. Copy the token now, since GitHub shows it once.
 
 > Skipping **Workflows** is the most common mistake, and GitHub reports it as a **404** that reads like "repo not found" rather than a permissions error.
 
-> Without **Pages**, everything still saves — only the dashboard deploy fails, and step 4 tells you the one setting to flip by hand.
+**One extra click after step 4.** Turning on GitHub Pages through the API needs *Administration: read and write* — permission to change your repository's settings, delete it, and manage who can see it. That is far more than a session tracker should hold, so LeetLens does not ask for it. Instead, once per repo, open your repo's *Settings → Pages* and set **Source** to **GitHub Actions**. Everything else is automatic, and sessions save whether or not you do this; only the dashboard needs it.
 
 ### 4. Connect
 
@@ -56,7 +55,7 @@ Open the extension's options page: `chrome://extensions` → LeetLens → **Deta
 
 1. **Connect GitHub** — paste the token, press Save token.
 2. **Choose the repo** — owner, repository, branch, then **Test connection**. A 404 here means the token wasn't granted that repo, or the name is wrong.
-3. **Set up the repo** — commits the dashboard workflow, the sessions folder, and the files that let Claude Code read your repo. If it couldn't enable Pages itself, it links the one manual step: your repo's *Settings → Pages → Source: **GitHub Actions***.
+3. **Set up the repo** — commits the dashboard workflow, the sessions folder, and the files that let Claude Code read your repo. It then links the one manual step from step 3: your repo's *Settings → Pages → Source: **GitHub Actions***.
 
 The last screen shows your dashboard link, your analysis connector URL, and a one-line command for Claude Code. Keep them.
 

@@ -31,10 +31,19 @@ Repository permissions:
 | Contents | Read and write | Committing sessions and solutions |
 | Workflows | Read and write | Writing `.github/workflows/publish.yml` during setup |
 | Pages | Read and write | Turning the dashboard on without a manual step |
+| Administration | Read and write | Also required to turn Pages on; see below |
 | Metadata | Read-only | Added automatically |
 
 No account permissions. Generate **no** client secret: device flow does not use
 one, and refreshing a device-flow token does not either.
+
+**Decide on Administration deliberately.** Enabling Pages through the API wants
+`pages=write` *and* `administration=write` — GitHub says so only in the
+`x-accepted-github-permissions` header of the 403, never in its docs. Administration
+also covers deleting the repository and changing who can see it. Declaring it saves
+each user three clicks, once, and asks them to trust the app with far more than
+session tracking; leaving it out keeps the app minimal and keeps the manual Pages
+step. The token path already chose the second, and the two should not disagree.
 
 Leave user-token expiration enabled (the default). Tokens then last 8 hours and
 come with a refresh token valid for 6 months, which the extension uses

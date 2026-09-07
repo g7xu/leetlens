@@ -200,6 +200,11 @@ export const MCP_JSON = `${JSON.stringify({
  * how that site builds. A repo left on "deploy from a branch" answers 409 and
  * then rejects every deployment the workflow produces, so the update call —
  * not the create — is what makes an existing site work.
+ *
+ * Both calls want `pages=write` *and* `administration=write`, which GitHub
+ * states only in the x-accepted-github-permissions header of the 403. A token
+ * scoped to committing sessions will not carry the second, so failing here is
+ * ordinary and the caller offers the one-time manual step instead.
  */
 export async function enablePages() {
   const { owner, repo } = await getSettings();
