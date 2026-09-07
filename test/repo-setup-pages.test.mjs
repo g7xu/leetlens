@@ -29,7 +29,7 @@ test('an existing site is switched to workflow builds, not assumed to be right',
   // repo on "deploy from a branch" answers 409 and then rejects every deploy.
   const calls = installFakeFetch([
     { status: 409, json: { message: 'already exists' } },
-    { status: 200, json: {} },
+    { status: 204, json: {} }, // GitHub answers the update with No Content
   ]);
   assert.deepEqual(await enablePages(), { enabled: true });
   assert.equal(calls.length, 2, 'the update call is what fixes an existing site');
