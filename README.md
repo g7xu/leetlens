@@ -48,6 +48,8 @@ Metadata is added automatically; leave everything else at No access. Copy the to
 
 > Skipping **Workflows** is the most common mistake, and GitHub reports it as a **404** that reads like "repo not found" rather than a permissions error.
 
+> Without **Pages**, everything still saves — only the dashboard deploy fails, and step 4 tells you the one setting to flip by hand.
+
 ### 4. Connect
 
 Open the extension's options page: `chrome://extensions` → LeetLens → **Details** → **Extension options**. It walks you through three steps and each one collapses when it succeeds.
