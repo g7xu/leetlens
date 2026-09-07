@@ -10,89 +10,103 @@ Four pieces: the Chrome extension (`extension/`), the MCP server (`mcp/`), the d
 
 ## Setup
 
+Five steps, about ten minutes. You need a GitHub account and Chrome.
+
 ### 1. Install the extension
 
-Build it — needs [Node](https://nodejs.org/) 20+:
+Download **`leetlens-<version>.zip`** from the [latest release](https://github.com/g7xu/leetlens/releases/latest) and unzip it.
 
-```bash
-git clone https://github.com/g7xu/leetlens.git
-cd leetlens
-npm install
-npm run build
-```
+Then open `chrome://extensions`, turn on **Developer mode** (top right), click **Load unpacked**, and select the unzipped folder.
 
-Then `chrome://extensions` → enable Developer mode → **Load unpacked** → select the generated **`dist/`** folder.
+<details>
+<summary>Building it yourself instead</summary>
 
-> `dist/` is what Chrome loads; `extension/` holds the sources and has no manifest at its top level. If you previously loaded `extension/`, remove that entry first — Chrome keeps running the old copy otherwise.
-
-Prefer not to build? Every [release](https://github.com/g7xu/leetlens/releases) attaches a ready-to-load `leetlens-<version>.zip` — download, unzip, and load that folder instead.
+Needs [Node](https://nodejs.org/) 20+. `npm install && npm run build`, then load the generated **`dist/`** folder — not `extension/`, which holds the sources and has no manifest at its top level. If you previously loaded `extension/`, remove that entry first; Chrome keeps running the old copy otherwise.
+</details>
 
 ### 2. Create (or pick) your data repo
 
-Any repo works: create an empty one (e.g. `leetcode-journal`), or reuse an existing LeetHub repo — LeetLens writes sessions to `data/sessions/` and solutions to the same `<id>-<slug>/` folders LeetHub uses.
+Any repo works: an empty new one (`leetcode-journal`, say), or an existing LeetHub repo, since LeetLens writes solutions to the same `<id>-<slug>/` folders. Note the owner and name; you'll paste them in step 4.
 
-> GitHub Pages requires a public repo on free plans. A public data repo makes everything in it public: your sessions, your solutions, and whatever you write in the thinking area. A private repo works too, but loses the dashboard and the hosted MCP server.
+> **Make it public.** GitHub Pages needs public on free plans, and so does the hosted analysis server. That means your sessions, your solutions, and anything you type in the thinking area are visible to anyone. A private repo works for saving sessions but loses the dashboard and the hosted server.
 
 ### 3. Create a fine-grained personal access token
 
-Create a [fine-grained token](https://github.com/settings/personal-access-tokens/new) — the two settings below are the ones that cause `403: Resource not accessible by personal access token` when missed:
+Create one at [Settings → Fine-grained tokens](https://github.com/settings/personal-access-tokens/new).
 
-- **Repository access**: choose **Only select repositories** and pick *your data repo*. If the repo is *private*, the default "Public repositories" option silently excludes it.
-- **Repository permissions**: in the *Select repository permissions* search box type **contents** (search by permission *name* — typing "read" finds nothing), click **Contents**, then set its *Access* dropdown to **Read and write**. "Metadata: Read-only" is added automatically — leave it.
-- **Workflows — Read and write.** Setup commits `.github/workflows/publish.yml`, and GitHub gates workflow files behind this separate permission. Without it the setup button fails with a **404** that looks like a missing repo.
-- Optional: also grant **Pages — Read and write** so the setup button can enable your dashboard automatically.
-- Everything else stays at "No access". When the token expires, commits start failing with 401 — regenerate and re-paste.
+**Repository access:** choose **Only select repositories** and pick your data repo. The default "Public repositories" option silently excludes a private one.
 
-### 4. Connect and set up
+**Repository permissions:** search the box by permission *name* (typing "read" finds nothing), and set:
 
-Open the extension's Options page, fill owner / repo / branch, paste the token:
+| Permission | Access | Why |
+|---|---|---|
+| Contents | Read and write | Committing your sessions and solutions |
+| Workflows | Read and write | Step 4 commits a workflow file, which GitHub gates separately |
+| Pages | Read and write | Lets step 4 turn on your dashboard for you |
 
-1. **Test connection** → you want the green *"sessions can be saved ✓"*. "repo lookup failed (404)" means the repo isn't granted to the token; "token cannot push" means Contents is still read-only. This step can't verify the Workflows permission — only step 2 exercises it.
-2. **Set up repo for LeetLens** → commits the dashboard workflow and sessions folder into your repo. A 404 here means the token is missing **Workflows: Read and write** (GitHub reports that as "not found", not "forbidden"). If the button couldn't enable GitHub Pages itself, do the one manual step it links: repo *Settings → Pages → Source: **GitHub Actions***.
+Metadata is added automatically; leave everything else at No access. Copy the token now, since GitHub shows it once.
 
-That's it. Open any LeetCode problem — the LeetLens panel appears, a *thinking area* block comment is added to the top of the editor for sketching your approach, and **Finish → Save to GitHub** commits the session + your code. Your dashboard lives at `https://<owner>.github.io/<repo>/` and rebuilds on every push.
+> Skipping **Workflows** is the most common mistake, and GitHub reports it as a **404** that reads like "repo not found" rather than a permissions error.
 
-Write as much as you like in the thinking area: it's a block comment, so it never affects your code, time spent there counts as *thinking* rather than *writing*, and its text is read when you finish and used to fill in the session's logic idea. It's stripped from the solution file that gets committed. Languages with no block-comment syntax (Erlang, Elixir, Bash) don't get one — use the logic-idea box on the save form instead.
+### 4. Connect
 
-Your data repo's workflow pins the LeetLens toolchain with `LEETLENS_REF: v2`, a moving major tag; pin an exact release tag instead if you prefer reproducibility. The tag policy is in [ARCHITECTURE.md](ARCHITECTURE.md#the-two-repo-model).
+Open the extension's options page: `chrome://extensions` → LeetLens → **Details** → **Extension options**. It walks you through three steps and each one collapses when it succeeds.
 
-> **Upgrading from `v1`.** Sessions now record LeetCode's own topic tags (so weak-area analysis works even if you never tag anything yourself) and keep a copy of the code from every attempt, not just the last one. Change `LEETLENS_REF: v1` to `v2` in your data repo's `.github/workflows/publish.yml` and push; old sessions keep working, they just have no topics. Staying on `v1` is fine — v1 ignores the new fields.
+1. **Connect GitHub** — paste the token, press Save token.
+2. **Choose the repo** — owner, repository, branch, then **Test connection**. A 404 here means the token wasn't granted that repo, or the name is wrong.
+3. **Set up the repo** — commits the dashboard workflow, the sessions folder, and the files that let Claude Code read your repo. If it couldn't enable Pages itself, it links the one manual step: your repo's *Settings → Pages → Source: **GitHub Actions***.
 
-### 5. MCP server (Claude Code / Claude Desktop / ChatGPT)
+The last screen shows your dashboard link, your analysis connector URL, and a one-line command for Claude Code. Keep them.
 
-Requires [uv](https://docs.astral.sh/uv/). Point it at a local clone of **your data repo**:
+### 5. Solve something
+
+Open any LeetCode problem. The LeetLens panel appears, and a **thinking area** comment block is added at the top of the editor.
+
+Sketch your approach there before you start coding. It's a block comment, so it never affects your code, time spent in it counts as *thinking* rather than *writing*, and its text becomes your session's logic idea. It's stripped out of the committed solution. Languages with no block-comment form (Erlang, Elixir, Bash) don't get one; use the logic-idea box on the save form.
+
+When you're done, press **✓ Finish** (or **Give up** — those sessions are the interesting ones), fill in the save form, and press **Save to GitHub**.
+
+Your repo now has a session record, your solution, and a copy of this attempt under `attempts/`. A minute later your dashboard is live at `https://<owner>.github.io/<repo>/`, and it rebuilds on every save.
+
+## Analyzing your practice
+
+Ask an AI what you're bad at. The hosted server serves any public data repo, with nothing to install — put your owner and repo in the URL:
+
+```
+https://leetlens-mcp.vercel.app/<owner>/<your-data-repo>/mcp
+```
+
+Add that as a custom connector in **Claude.ai** (Settings → Connectors) or **ChatGPT** (Settings → Connectors, developer mode). For Claude Code:
+
+```bash
+claude mcp add --transport http leetlens https://leetlens-mcp.vercel.app/<owner>/<your-data-repo>/mcp
+```
+
+Then ask things like *"what are my weakest topics and why"*, *"what should I practice next"*, or *"show me what changed between my failed attempt at Coin Change and the one that passed"*.
+
+Your data repo also gets an `AGENTS.md` and a `.mcp.json`, so opening it as a folder in Claude Code or Codex works with no configuration at all.
+
+<details>
+<summary>Running the server yourself (private repos, or offline)</summary>
+
+Requires [uv](https://docs.astral.sh/uv/). Against a local clone of your data repo:
 
 ```bash
 claude mcp add leetlens --env LCP_REPO_PATH=/path/to/your-data-repo \
   -- uv run --directory /path/to/leetlens/mcp leetlens-mcp
 ```
 
-Claude Desktop (`claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "leetlens": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/leetlens/mcp", "leetlens-mcp"],
-      "env": { "LCP_REPO_PATH": "/path/to/your-data-repo" }
-    }
-  }
-}
-```
-
-**No install at all: the hosted server.** One public endpoint serves any public data repo; put your owner and repo in the URL:
+Or fetch a private repo from GitHub directly:
 
 ```bash
-claude mcp add --transport http leetlens https://leetlens-mcp.vercel.app/<owner>/<your-data-repo>/mcp
-```
-
-The same URL works as a custom connector in Claude.ai (Settings → Connectors) and in ChatGPT (Settings → Connectors, developer mode); the `search` / `fetch` pair follows ChatGPT's connector contract, so deep research can use it too. The server reads your repo's generated `data/index.json`, so the repo must be public and set up with the extension (one push after **Set up repo** is enough). Private data repo? Run the server yourself against a local clone (above) or fetch from GitHub with a token:
-
-```bash
-LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> LCP_GITHUB_TOKEN=<fine-grained PAT, Contents: read> \
+LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<repo> LCP_GITHUB_TOKEN=<token, Contents: read> \
   uv run --directory mcp leetlens-mcp --transport http --port 8765
 ```
+</details>
+
+Your data repo's workflow pins the toolchain with `LEETLENS_REF: v2`, a moving major tag; pin an exact release tag instead if you prefer reproducibility. The policy is in [ARCHITECTURE.md](ARCHITECTURE.md#the-two-repo-model).
+
+> **Upgrading from `v1`?** Sessions now record LeetCode's own topic tags, so weak-area analysis works even if you never tag anything yourself, and every attempt's code is kept rather than only the last. Change `LEETLENS_REF: v1` to `v2` in your data repo's `.github/workflows/publish.yml` and push. Old sessions keep working; they just have no topics. Staying on `v1` is fine.
 
 <details>
 <summary><b>Reference: tools, prompt, resources, env vars</b></summary>
@@ -102,13 +116,13 @@ LCP_SOURCE=github LCP_GITHUB_REPO=<owner>/<your-data-repo> LCP_GITHUB_TOKEN=<fin
 | `search` | Free-text search over problems and tags, every word must match; the ChatGPT connector contract |
 | `fetch` | One document by id from `search`: a problem with every attempt + solution, or a tag with its stats |
 | `list_sessions` | Sessions newest first, filterable by tag / difficulty / outcome / date |
-| `get_problem_details` | Everything about one problem: all sessions + committed solution source |
-| `get_stats` | Aggregates per tag, difficulty, week, or month |
+| `get_problem_details` | Everything about one problem: every session, plus each attempt's code |
+| `get_stats` | Aggregates per tag, topic, difficulty, week, or month |
 | `get_trends` | A metric as a weekly/monthly time series |
-| `get_weak_areas` | Tags ranked weakest-first, with the scoring components |
-| `list_tags` | All tags with usage counts and last-seen date |
+| `get_weak_areas` | Topics (or your tags) ranked weakest-first, with every scoring component |
+| `list_tags` | Your tags, or LeetCode's topics, with usage counts and last-seen date |
 | `get_revenge_list` | Gave-up problems with no accepted session since |
-| `get_stale_tags` | Tags not practiced in N days |
+| `get_stale_tags` | Topics or tags not practiced in N days |
 | `recommend_next` | "Solve these next" with reasons |
 | `search_notes` | Text search over `logic_idea` and `comments` |
 | `compare_periods` | This month vs last month (or any two periods), with deltas |
