@@ -157,11 +157,11 @@ $('setup').addEventListener('click', async () => {
     status('status3', 'Workflow committed, GitHub Pages enabled ✓', 'ok');
   } else {
     const { owner, repo } = repoFields();
-    // Without Pages the workflow still records everything and only its last
-    // step fails, so name the cause: a token missing the Pages permission is
-    // a different fix from a repo that cannot host Pages at all.
+    // Turning Pages on needs Administration as well as Pages write, which
+    // GitHub only reveals in a response header. Most people will not have
+    // granted it, so the manual step is the expected path, not a failure.
     const because = resp.pagesStatus === 403 || resp.pagesStatus === 404
-      ? 'your token has no Pages permission, so '
+      ? 'your token cannot change repo settings, so '
       : '';
     $('status3').className = 'status ok';
     $('status3').replaceChildren(
@@ -171,8 +171,8 @@ $('setup').addEventListener('click', async () => {
         target: '_blank',
         textContent: 'Settings → Pages',
       }),
-      ' and set Source to "GitHub Actions". Until you do, sessions still save '
-      + 'but the dashboard deploy fails.',
+      ' and set Source to "GitHub Actions". Sessions save either way; this is '
+      + 'only the dashboard.',
     );
   }
   render();
